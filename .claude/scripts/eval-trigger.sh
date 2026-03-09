@@ -28,10 +28,13 @@ COUNT=$(git diff --cached --stat -- "$DIR" | tail -1)
 echo "staged: $COUNT"
 
 cleanup() {
-  # Undo: reset back to original HEAD (drops temp commit + staged add)
+  # Save learned-rules before resetting (skill-check may have updated it)
+  cp .claude/hooks/learned-rules.json /tmp/learned-rules-backup.json 2>/dev/null || true
   git reset --soft "$ORIG_HEAD" >/dev/null 2>&1 || true
   git checkout -- "$DIR" >/dev/null 2>&1 || true
-  echo "✓ git state restored"
+  # Restore learned-rules
+  cp /tmp/learned-rules-backup.json .claude/hooks/learned-rules.json 2>/dev/null || true
+  echo "✓ git state restored (learned-rules preserved)"
 }
 trap cleanup EXIT
 
