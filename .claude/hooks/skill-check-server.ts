@@ -81,7 +81,7 @@ const baseEnv = {
   ANTHROPIC_MODEL: 'qwen3.5-plus',
 };
 
-type Violation = { file: string; skill: string; rule: string; fix: string };
+type Violation = { file: string; skill: string; rule: string; fix: string; pattern?: string; filePattern?: string };
 type LearnedRule = { pattern: string; filePattern: string; message: string; skill: string; createdAt: string };
 
 const RULES_PATH = join(import.meta.dir, "learned-rules.json");
@@ -100,30 +100,21 @@ async function saveRules(rules: LearnedRule[]): Promise<void> {
 }
 
 function violationToRule(v: Violation): LearnedRule | null {
-  // Ask the AI sub-agent to also return a regex pattern — but as fallback,
-  // derive simple patterns from common violation types
-  const ruleMap: Record<string, { pattern: string; filePattern: string }> = {
-    "throw new Error": { pattern: "throw new Error\\(", filePattern: "routers/" },
-    "as string": { pattern: "as string\\b", filePattern: "\\.tsx?$" },
-    "as DealStage": { pattern: "as [A-Z]\\w+Stage", filePattern: "\\.tsx?$" },
-    "Record<string, unknown>": { pattern: "Record<string,\\s*unknown>", filePattern: "\\.ts$" },
-    "JSON.parse": { pattern: ":\\s*\\w+\\s*=.*JSON\\.parse", filePattern: "\\.tsx?$" },
-    "sql<number>": { pattern: "sql<number>", filePattern: "\\.ts$" },
-    "transformer: superjson": { pattern: "transformer:\\s*superjson", filePattern: "trpc" },
-  };
-
-  for (const [key, val] of Object.entries(ruleMap)) {
-    if (v.rule.includes(key) || v.fix.includes(key)) {
-      return {
-        pattern: val.pattern,
-        filePattern: val.filePattern,
-        message: `[${v.skill}] ${v.rule} → ${v.fix}`,
-        skill: v.skill,
-        createdAt: new Date().toISOString(),
-      };
-    }
+  // AI provides pattern + filePattern directly in the violation
+  if (!v.pattern) return null;
+  // Validate it's a usable regex
+  try {
+    new RegExp(v.pattern);
+  } catch {
+    return null;
   }
-  return null;
+  return {
+    pattern: v.pattern,
+    filePattern: v.filePattern ?? "\\.tsx?$",
+    message: `[${v.skill}] ${v.rule} → ${v.fix}`,
+    skill: v.skill,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 async function graduateViolations(violations: Violation[]): Promise<number> {
@@ -170,7 +161,7 @@ async function loadSkillFilePatterns(cwd: string, skillName: string): Promise<st
     const patterns: string[] = [];
     if (lower.includes("typescript") || lower.includes(".ts")) patterns.push(".ts", ".tsx");
     if (lower.includes("react") || lower.includes(".tsx") || lower.includes(".jsx")) patterns.push(".tsx", ".jsx");
-    if (lower.includes("next.js") || lower.includes("app router")) patterns.push("src/app/", "next.config");
+    if (lower.includes("next.js") || lower.includes("app router")) patterns.push("src/app/", "next.config", "src/components/", ".tsx");
     if (lower.includes("trpc") || lower.includes("router")) patterns.push("trpc", "routers/");
     if (lower.includes("drizzle") || lower.includes("database") || lower.includes("schema")) patterns.push("db/", "schema", "drizzle");
     if (lower.includes("shadcn") || lower.includes("component registry")) patterns.push("components/ui/", "components.json");
@@ -233,7 +224,9 @@ Do the following:
 
 Output your verdict as JSON on its own line prefixed with VERDICT:
 - No violations: VERDICT: {"ok": true}
-- Violations: VERDICT: {"ok": false, "violations": [{"file": "path", "skill": "${skillName}", "rule": "what was violated", "fix": "how to fix"}]}`,
+- Violations: VERDICT: {"ok": false, "violations": [{"file": "path", "skill": "${skillName}", "rule": "what was violated", "fix": "how to fix", "pattern": "grep -E regex to detect this violation", "filePattern": "regex matching file paths this applies to"}]}
+
+IMPORTANT: "pattern" must be a valid grep -E regex that catches this violation in source code. "filePattern" should match file paths (e.g. "\\\\.tsx?$", "routers/", "db/").`,
     options: {
       cwd,
       maxTurns: 6,

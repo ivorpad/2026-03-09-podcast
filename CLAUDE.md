@@ -7,7 +7,8 @@ CRM — a demo CRM built with agent-first harness engineering.
 - `pnpm dev` — starts dev server on port 3005
 - `pnpm db:migrate` — run database migrations
 - `pnpm lint` — run linter
-- Port: 3005
+- server port: 3005
+- NEVER kill the servers, let us run them ourselves.
 
 ## Stack
 
@@ -80,3 +81,4 @@ When writing complex features or significant refactors, use an ExecPlan (as desc
 | [docs/exec-plans/](./docs/exec-plans/) | Active and completed execution plans |
 | [docs/generated/](./docs/generated/) | Auto-generated docs (DB schema, etc.) |
 | [docs/references/](./docs/references/) | External reference material for LLMs |
+| [docs/references/mcporter.md](./docs/references/mcporter.md) | mcporter CLI ref — use with context7 MCP to find lib docs, then `mcporter call` to interact with MCP servers |

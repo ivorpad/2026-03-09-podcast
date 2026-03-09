@@ -11,10 +11,20 @@
       "sourceType": "github",
       "computedHash": "39459e68af51d6dd06ba58af327e1708eeb9ab0e500e6c078c690eafae17683f"
     },
+    "mcporter": {
+      "source": "steipete/clawdis",
+      "sourceType": "github",
+      "computedHash": "295be6858c69890f9566e849aade58e2d8db93c3ce49e11dba40b8ae33dd2419"
+    },
     "next-best-practices": {
       "source": "vercel/nextjs-skills",
       "sourceType": "github",
       "computedHash": "515ba75178bd44875812d9a560bdf14651f86709f89cf1d4f209638e879807f3"
+    },
+    "nextjs-app-router-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "d2f0a7065f7418fdb3ae88559f1f1426f40c26f2b5aebcd394797418d4bb3b04"
     },
     "shadcn": {
       "source": "shadcn/ui",
