@@ -6,6 +6,28 @@
 
 import { Hono } from "hono";
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+
+const DANGEROUS_PATTERNS = [
+  /\brm\s+-rf?\b/,
+  /\bgit\s+(push|reset|checkout\s+--|clean|branch\s+-[dD])/,
+  /\bdrop\s+(table|database)\b/i,
+  /\btruncate\b/i,
+  /\b(kill|pkill|killall)\b/,
+  /\bcurl\b.*\b(POST|PUT|DELETE|PATCH)\b/i,
+  /\bnpx?\s/,
+  /\bpnpm\s+(add|remove|install)\b/,
+  /\bchmod\b/,
+  /\bmkfs\b/,
+  /\bdd\s+if=/,
+];
+
+function isDangerous(command: string): string | null {
+  for (const pattern of DANGEROUS_PATTERNS) {
+    if (pattern.test(command)) return `Blocked: matches ${pattern}`;
+  }
+  return null;
+}
 
 const PORT = 7483;
 const app = new Hono();
@@ -36,9 +58,32 @@ After your review, output your final verdict as a JSON object on its own line, p
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
         allowedTools: ["Bash", "Read", "Glob"],
+        disallowedTools: ["Write", "Edit"],
         env: Object.fromEntries(
           Object.entries(process.env).filter(([k]) => !k.startsWith("CLAUDE"))
         ),
+        hooks: {
+          PreToolUse: [{
+            hooks: [async (input) => {
+              const { tool_name, tool_input } = input as PreToolUseHookInput;
+              if (tool_name === "Bash") {
+                const cmd = (tool_input as { command?: string }).command ?? "";
+                const reason = isDangerous(cmd);
+                if (reason) {
+                  console.log(`[skill-check] DENIED: ${cmd.slice(0, 80)} — ${reason}`);
+                  return {
+                    hookSpecificOutput: {
+                      hookEventName: "PreToolUse" as const,
+                      permissionDecision: "deny" as const,
+                      permissionDecisionReason: reason,
+                    },
+                  };
+                }
+              }
+              return {};
+            }],
+          }],
+        },
       },
     });
 
