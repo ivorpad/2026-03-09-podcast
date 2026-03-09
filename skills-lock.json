@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "building-components": {
+      "source": "vercel/components.build",
+      "sourceType": "github",
+      "computedHash": "ca96444b70257eb3f4f4c76dfdd4a32312c835fe3c8755d2e3d75ac78d384bfd"
+    },
+    "drizzle-best-practices": {
+      "source": "honra-io/drizzle-best-practices",
+      "sourceType": "github",
+      "computedHash": "39459e68af51d6dd06ba58af327e1708eeb9ab0e500e6c078c690eafae17683f"
+    },
+    "next-best-practices": {
+      "source": "vercel/nextjs-skills",
+      "sourceType": "github",
+      "computedHash": "515ba75178bd44875812d9a560bdf14651f86709f89cf1d4f209638e879807f3"
+    },
+    "trpc-type-safety": {
+      "source": "bobmatnyc/claude-mpm-skills",
+      "sourceType": "github",
+      "computedHash": "f9e7e6d27ad32ce56997e2d191a2fc816588e6282dc6597870a4437943e2d265"
+    },
+    "typescript-best-practices": {
+      "source": "ofershap/typescript-best-practices",
+      "sourceType": "github",
+      "computedHash": "4fed665a7697c420edd8e2afa18cf4ba8c86a6fe93924fc7f45cf769c693b6a7"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "3462ec83f862abb2d532953df33a4dbf87f4616849da5d4b5cc7c13601aaf997"
+    }
+  }
+}
