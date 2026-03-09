@@ -9,15 +9,43 @@
   {
     "pattern": "throw new Error\\(",
     "filePattern": "routers/",
-    "message": "[drizzle-best-practices] Using generic Error instead of TRPCError in router loses structured error handling → Use throw new TRPCError({ code: 'NOT_FOUND', message: '...' })",
+    "message": "[drizzle-best-practices] Using generic Error instead of TRPCError in router → Use throw new TRPCError({ code: 'NOT_FOUND', message: '...' })",
     "skill": "drizzle-best-practices",
     "createdAt": "2026-03-09T20:07:56.974Z"
   },
   {
     "pattern": "<script[\\s>][^>]*dangerouslySetInnerHTML(?!.*\\bid\\b)",
     "filePattern": "\\.tsx$",
-    "message": "[next-best-practices] Inline script missing id attribute → Add id for Next.js to track it: <script id=\"...\" dangerouslySetInnerHTML={{ ... }} />",
+    "message": "[next-best-practices] Inline script missing id attribute → Add id: <script id=\"...\" dangerouslySetInnerHTML={{ ... }} />",
     "skill": "next-best-practices",
     "createdAt": "2026-03-09T20:20:06.254Z"
+  },
+  {
+    "pattern": "useEffect.*fetch\\(",
+    "filePattern": "\\.tsx?$",
+    "message": "[nextjs-app-router-patterns] Don't fetch in Client Components with useEffect → Use Server Components for data fetching, or React Query if client-side fetching is required",
+    "skill": "nextjs-app-router-patterns",
+    "createdAt": "2026-03-09T20:52:30.822Z"
+  },
+  {
+    "pattern": "\\.json\\(\\)\\s*\\.then",
+    "filePattern": "\\.tsx?$",
+    "message": "[typescript-best-practices] fetch .json() returns any → Validate with a type guard or Zod schema before using the data",
+    "skill": "typescript-best-practices",
+    "createdAt": "2026-03-09T20:52:30.822Z"
+  },
+  {
+    "pattern": "<div>\\s*\\{[^}]*\\.map\\([^)]+\\)\\s*=>\\s*<p",
+    "filePattern": "\\.tsx?$",
+    "message": "[building-components] Use semantic HTML — lists should use <ul>/<li> not <div>/<p>",
+    "skill": "building-components",
+    "createdAt": "2026-03-09T20:53:42.986Z"
+  },
+  {
+    "pattern": "useEffect.*fetch\\(.*\\.then\\(.*\\.json\\(\\)",
+    "filePattern": "\\.tsx?$",
+    "message": "[vercel-react-best-practices] client-swr-dedup - Use SWR for automatic deduplication instead of raw fetch in useEffect → Replace useEffect+fetch with useSWR hook: const { data } = useSWR('/api/trpc/contacts.list', fetcher)",
+    "skill": "vercel-react-best-practices",
+    "createdAt": "2026-03-09T20:55:11.054Z"
   }
 ]

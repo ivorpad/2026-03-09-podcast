@@ -7,6 +7,7 @@ description: >
   drizzle-orm imports, pgTable definitions, drizzle-kit config files, or relational query
   patterns. Also use when setting up a new project with Drizzle + Postgres, migrating from
   another ORM, or troubleshooting type errors in Drizzle schemas.
+file_patterns: ["db/", "schema", "drizzle", "migrations/"]
 license: MIT
 compatibility: TypeScript projects using Node.js or edge runtimes with drizzle-orm and a PostgreSQL database.
 metadata:

@@ -117,19 +117,95 @@ function violationToRule(v: Violation): LearnedRule | null {
   };
 }
 
+// Extract key concepts from a rule message for semantic dedup
+function extractConcepts(message: string): Set<string> {
+  const normalized = message.toLowerCase().replace(/[^a-z0-9\s]/g, " ");
+  // Extract multi-word phrases and significant single words
+  const concepts = new Set<string>();
+  const phrases = [
+    "use client", "use server", "server component", "client component",
+    "use effect", "use state", "use reducer", "use context",
+    "fetch in", "loading state", "suspense", "skeleton",
+    "type guard", "type predicate", "type assertion",
+    "any type", "unknown type", "no any", "never use any",
+    "trpc error", "throw error", "error handling",
+    "dangerouslysetinnerhtml", "inline script",
+    "react query", "data fetching",
+  ];
+  for (const phrase of phrases) {
+    if (normalized.includes(phrase)) concepts.add(phrase);
+  }
+  // Also add the core violation verb+object (e.g. "missing directive", "hooks without")
+  const words = normalized.split(/\s+/).filter((w) => w.length > 4);
+  for (const w of words) concepts.add(w);
+  return concepts;
+}
+
+function isDuplicateByIntent(newMsg: string, existingMessages: string[]): boolean {
+  const newConcepts = extractConcepts(newMsg);
+  for (const existing of existingMessages) {
+    const existingConcepts = extractConcepts(existing);
+    // Count overlapping concepts
+    let overlap = 0;
+    for (const c of newConcepts) {
+      if (existingConcepts.has(c)) overlap++;
+    }
+    const smaller = Math.min(newConcepts.size, existingConcepts.size);
+    // If >60% of the smaller concept set overlaps, it's a duplicate
+    if (smaller > 0 && overlap / smaller > 0.6) return true;
+  }
+  return false;
+}
+
+function regexToSample(pattern: string): string {
+  // Turn a regex into a plausible literal string it would match
+  let s = pattern;
+  s = s.replace(/\\\\/g, "BSLASH");
+  s = s.replace(/\\s[+*]/g, " ");
+  s = s.replace(/\\w[+*]/g, "foo");
+  s = s.replace(/\\[(){}[\].^$|]/g, (m) => m[1]);
+  s = s.replace(/\.\*/g, "xxx");
+  s = s.replace(/\.\+/g, "x");
+  s = s.replace(/\[[^\]]*\]/g, "x");
+  s = s.replace(/[+*?]/g, "");
+  s = s.replace(/[{}()]/g, "");
+  s = s.replace(/BSLASH/g, "\\");
+  return s;
+}
+
+function isPatternSubsumed(newPattern: string, existingRules: LearnedRule[]): boolean {
+  const sample = regexToSample(newPattern);
+  for (const rule of existingRules) {
+    try {
+      if (new RegExp(rule.pattern).test(sample)) return true;
+    } catch { /* skip invalid */ }
+  }
+  return false;
+}
+
 async function graduateViolations(violations: Violation[]): Promise<number> {
   const existing = await loadRules();
   const existingPatterns = new Set(existing.map((r) => r.pattern));
+  const allMessages = existing.map((r) => r.message);
   let added = 0;
 
   for (const v of violations) {
     const rule = violationToRule(v);
-    if (rule && !existingPatterns.has(rule.pattern)) {
-      existing.push(rule);
-      existingPatterns.add(rule.pattern);
-      added++;
-      console.log(`[skill-check] graduated rule: ${rule.pattern}`);
+    if (!rule) continue;
+    if (existingPatterns.has(rule.pattern)) continue;
+    if (isDuplicateByIntent(rule.message, allMessages)) {
+      console.log(`[skill-check] skipped duplicate intent: ${rule.message.slice(0, 80)}`);
+      continue;
     }
+    if (isPatternSubsumed(rule.pattern, existing)) {
+      console.log(`[skill-check] skipped subsumed pattern: ${rule.pattern}`);
+      continue;
+    }
+    existing.push(rule);
+    existingPatterns.add(rule.pattern);
+    allMessages.push(rule.message);
+    added++;
+    console.log(`[skill-check] graduated rule: ${rule.pattern}`);
   }
 
   if (added > 0) await saveRules(existing);
@@ -156,17 +232,9 @@ async function loadSkillFilePatterns(cwd: string, skillName: string): Promise<st
     if (match) {
       return match[1].split(",").map((s) => s.trim().replace(/["']/g, ""));
     }
-    // Fallback: extract from description keywords
-    const lower = content.toLowerCase();
-    const patterns: string[] = [];
-    if (lower.includes("typescript") || lower.includes(".ts")) patterns.push(".ts", ".tsx");
-    if (lower.includes("react") || lower.includes(".tsx") || lower.includes(".jsx")) patterns.push(".tsx", ".jsx");
-    if (lower.includes("next.js") || lower.includes("app router")) patterns.push("src/app/", "next.config", "src/components/", ".tsx");
-    if (lower.includes("trpc") || lower.includes("router")) patterns.push("trpc", "routers/");
-    if (lower.includes("drizzle") || lower.includes("database") || lower.includes("schema")) patterns.push("db/", "schema", "drizzle");
-    if (lower.includes("shadcn") || lower.includes("component registry")) patterns.push("components/ui/", "components.json");
-    if (lower.includes("component") && !lower.includes("shadcn")) patterns.push("components/");
-    return patterns;
+    // No file_patterns declared — skip this skill (require explicit opt-in)
+    console.log(`[skill-check] skill "${skillName}" has no file_patterns in SKILL.md — skipping`);
+    return [];
   } catch {
     return [];
   }
