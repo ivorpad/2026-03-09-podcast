@@ -4,7 +4,22 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { dealCreateSchema, dealStages, type DealCreate } from "@/shared/schemas";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import {
+  Field,
+  FieldLabel,
+  FieldGroup,
+  FieldError,
+} from "@/components/ui/field";
+import {
+  dealCreateSchema,
+  dealStages,
+  type DealCreate,
+} from "@/shared/schemas";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -12,9 +27,15 @@ interface DealFormProps {
   initialData?: DealCreate & { id?: number };
   onSubmit: (data: DealCreate) => void;
   onCancel: () => void;
+  isPending?: boolean;
 }
 
-export function DealForm({ initialData, onSubmit, onCancel }: DealFormProps) {
+export function DealForm({
+  initialData,
+  onSubmit,
+  onCancel,
+  isPending,
+}: DealFormProps) {
   const [form, setForm] = useState<DealCreate>({
     title: initialData?.title ?? "",
     value: initialData?.value ?? 0,
@@ -44,108 +65,123 @@ export function DealForm({ initialData, onSubmit, onCancel }: DealFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="text-sm font-medium">Title *</label>
-        <Input
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
-          placeholder="Deal title"
-        />
-        {errors.title && (
-          <p className="text-xs text-red-500 mt-1">{errors.title}</p>
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-sm font-medium">Value ($)</label>
+    <form onSubmit={handleSubmit}>
+      <FieldGroup>
+        <Field data-invalid={!!errors.title || undefined}>
+          <FieldLabel htmlFor="deal-title">Title</FieldLabel>
           <Input
-            type="number"
-            value={form.value ?? ""}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                value: e.target.value ? Number(e.target.value) : undefined,
-              })
-            }
-            placeholder="0"
+            id="deal-title"
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            placeholder="Deal title"
+            aria-invalid={!!errors.title || undefined}
           />
+          {errors.title && <FieldError>{errors.title}</FieldError>}
+        </Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field>
+            <FieldLabel htmlFor="deal-value">Value ($)</FieldLabel>
+            <Input
+              id="deal-value"
+              type="number"
+              value={form.value ?? ""}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  value: e.target.value ? Number(e.target.value) : undefined,
+                })
+              }
+              placeholder="0"
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="deal-stage">Stage</FieldLabel>
+            <NativeSelect
+              id="deal-stage"
+              className="w-full"
+              value={form.stage}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  stage: e.target.value as DealCreate["stage"],
+                })
+              }
+            >
+              {dealStages.map((stage) => (
+                <NativeSelectOption key={stage} value={stage}>
+                  {stage}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
         </div>
-        <div>
-          <label className="text-sm font-medium">Stage</label>
-          <select
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-            value={form.stage}
-            onChange={(e) =>
-              setForm({ ...form, stage: e.target.value as DealCreate["stage"] })
-            }
-          >
-            {dealStages.map((stage) => (
-              <option key={stage} value={stage}>
-                {stage}
-              </option>
-            ))}
-          </select>
+        <div className="grid grid-cols-2 gap-4">
+          <Field>
+            <FieldLabel htmlFor="deal-contact">Contact</FieldLabel>
+            <NativeSelect
+              id="deal-contact"
+              className="w-full"
+              value={form.contactId ?? ""}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  contactId: e.target.value
+                    ? Number(e.target.value)
+                    : undefined,
+                })
+              }
+            >
+              <NativeSelectOption value="">No contact</NativeSelectOption>
+              {contacts.data?.items.map((c) => (
+                <NativeSelectOption key={c.id} value={c.id}>
+                  {c.firstName} {c.lastName}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="deal-company">Company</FieldLabel>
+            <NativeSelect
+              id="deal-company"
+              className="w-full"
+              value={form.companyId ?? ""}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  companyId: e.target.value
+                    ? Number(e.target.value)
+                    : undefined,
+                })
+              }
+            >
+              <NativeSelectOption value="">No company</NativeSelectOption>
+              {companies.data?.items.map((c) => (
+                <NativeSelectOption key={c.id} value={c.id}>
+                  {c.name}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
         </div>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-sm font-medium">Contact</label>
-          <select
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-            value={form.contactId ?? ""}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                contactId: e.target.value ? Number(e.target.value) : undefined,
-              })
-            }
-          >
-            <option value="">No contact</option>
-            {contacts.data?.items.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.firstName} {c.lastName}
-              </option>
-            ))}
-          </select>
+        <Field>
+          <FieldLabel htmlFor="deal-notes">Notes</FieldLabel>
+          <Textarea
+            id="deal-notes"
+            value={form.notes ?? ""}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            placeholder="Notes about this deal"
+          />
+        </Field>
+        <div className="flex gap-2 justify-end">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isPending}>
+            {isPending && <Spinner data-icon="inline-start" />}
+            {initialData?.id ? "Update" : "Create"} Deal
+          </Button>
         </div>
-        <div>
-          <label className="text-sm font-medium">Company</label>
-          <select
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-            value={form.companyId ?? ""}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                companyId: e.target.value ? Number(e.target.value) : undefined,
-              })
-            }
-          >
-            <option value="">No company</option>
-            {companies.data?.items.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-      <div>
-        <label className="text-sm font-medium">Notes</label>
-        <Textarea
-          value={form.notes ?? ""}
-          onChange={(e) => setForm({ ...form, notes: e.target.value })}
-          placeholder="Notes about this deal"
-        />
-      </div>
-      <div className="flex gap-2 justify-end">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit">
-          {initialData?.id ? "Update" : "Create"} Deal
-        </Button>
-      </div>
+      </FieldGroup>
     </form>
   );
 }

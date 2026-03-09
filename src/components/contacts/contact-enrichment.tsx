@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Spinner } from "@/components/ui/spinner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { WandIcon, CheckIcon, XIcon } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import type { ContactEnrichment } from "@/shared/schemas";
@@ -39,22 +42,30 @@ export function ContactEnrichmentCard({ contactId }: { contactId: number }) {
   };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">AI Enrichment</CardTitle>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => enrich.mutate(contactId)}
-          disabled={enrich.isPending}
-        >
-          {enrich.isPending ? "Enriching..." : "Enrich Contact"}
-        </Button>
+    <Card className="border-l-2 border-primary">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium">AI Enrichment</CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => enrich.mutate(contactId)}
+            disabled={enrich.isPending}
+          >
+            {enrich.isPending ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <WandIcon data-icon="inline-start" />
+            )}
+            {enrich.isPending ? "Enriching..." : "Enrich Contact"}
+          </Button>
+        </div>
       </CardHeader>
-      <CardContent>
+      <Separator />
+      <CardContent className="pt-4">
         {suggestions ? (
-          <div className="space-y-3">
-            <div className="text-sm space-y-1">
+          <div className="flex flex-col gap-3">
+            <div className="text-sm flex flex-col gap-1">
               <p>
                 <span className="font-medium">Suggested Title:</span>{" "}
                 {suggestions.suggestedTitle}
@@ -76,11 +87,21 @@ export function ContactEnrichmentCard({ contactId }: { contactId: number }) {
                     ? "destructive"
                     : "outline"
               }
+              className="w-fit"
             >
               Confidence: {suggestions.confidence}
             </Badge>
-            <div className="flex gap-2 pt-2">
-              <Button size="sm" onClick={handleApply}>
+            <div className="flex gap-2 pt-1">
+              <Button
+                size="sm"
+                onClick={handleApply}
+                disabled={updateContact.isPending}
+              >
+                {updateContact.isPending ? (
+                  <Spinner data-icon="inline-start" />
+                ) : (
+                  <CheckIcon data-icon="inline-start" />
+                )}
                 Apply Suggestions
               </Button>
               <Button
@@ -88,6 +109,7 @@ export function ContactEnrichmentCard({ contactId }: { contactId: number }) {
                 variant="outline"
                 onClick={() => setSuggestions(null)}
               >
+                <XIcon data-icon="inline-start" />
                 Dismiss
               </Button>
             </div>

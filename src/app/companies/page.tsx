@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -20,6 +22,7 @@ import {
 import { CompanyForm } from "@/components/companies/company-form";
 import type { CompanyCreate } from "@/shared/schemas";
 import { toast } from "sonner";
+import { PlusIcon, PencilIcon, TrashIcon } from "lucide-react";
 
 export default function CompaniesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -65,84 +68,92 @@ export default function CompaniesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-4 p-4 lg:p-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Companies</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {companies.data?.total ?? 0} companies
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          {companies.data?.total ?? 0} companies
+        </p>
         <Button
           onClick={() => {
             setEditing(null);
             setDialogOpen(true);
           }}
         >
+          <PlusIcon data-icon="inline-start" />
           Add Company
         </Button>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Industry</TableHead>
-            <TableHead>Website</TableHead>
-            <TableHead>Size</TableHead>
-            <TableHead className="w-[100px]">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {companies.data?.items.map((company) => (
-            <TableRow key={company.id}>
-              <TableCell className="font-medium">{company.name}</TableCell>
-              <TableCell>{company.industry ?? "-"}</TableCell>
-              <TableCell>{company.website ?? "-"}</TableCell>
-              <TableCell>{company.size ?? "-"}</TableCell>
-              <TableCell>
-                <div className="flex gap-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setEditing({
-                        id: company.id,
-                        name: company.name,
-                        industry: company.industry ?? "",
-                        website: company.website ?? "",
-                        size: company.size ?? "",
-                        notes: company.notes ?? "",
-                      });
-                      setDialogOpen(true);
-                    }}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-red-500"
-                    onClick={() => {
-                      if (confirm("Delete this company?"))
-                        deleteMutation.mutate(company.id);
-                    }}
-                  >
-                    Del
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
+      {companies.isLoading ? (
+        <div className="flex flex-col gap-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
           ))}
-          {companies.data?.items.length === 0 && (
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
-                No companies yet
-              </TableCell>
+              <TableHead className="text-xs uppercase tracking-wider">Name</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider">Industry</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider">Website</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider">Size</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider w-24">Actions</TableHead>
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {companies.data?.items.map((company) => (
+              <TableRow key={company.id} className="group">
+                <TableCell className="font-medium">{company.name}</TableCell>
+                <TableCell className="text-muted-foreground">{company.industry ?? "-"}</TableCell>
+                <TableCell className="text-muted-foreground">{company.website ?? "-"}</TableCell>
+                <TableCell className="text-muted-foreground">{company.size ?? "-"}</TableCell>
+                <TableCell>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setEditing({
+                          id: company.id,
+                          name: company.name,
+                          industry: company.industry ?? "",
+                          website: company.website ?? "",
+                          size: company.size ?? "",
+                          notes: company.notes ?? "",
+                        });
+                        setDialogOpen(true);
+                      }}
+                    >
+                      <PencilIcon />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        if (confirm("Delete this company?"))
+                          deleteMutation.mutate(company.id);
+                      }}
+                    >
+                      <TrashIcon />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {companies.data?.items.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={5}
+                  className="text-center text-muted-foreground py-8"
+                >
+                  No companies yet. Add one to get started.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      )}
 
       <Dialog
         open={dialogOpen}
@@ -156,6 +167,11 @@ export default function CompaniesPage() {
             <DialogTitle>
               {editing ? "Edit Company" : "New Company"}
             </DialogTitle>
+            <DialogDescription>
+              {editing
+                ? "Update the company details below."
+                : "Fill in the details to create a new company."}
+            </DialogDescription>
           </DialogHeader>
           <CompanyForm
             initialData={editing ?? undefined}
@@ -164,6 +180,7 @@ export default function CompaniesPage() {
               setDialogOpen(false);
               setEditing(null);
             }}
+            isPending={createMutation.isPending || updateMutation.isPending}
           />
         </DialogContent>
       </Dialog>
