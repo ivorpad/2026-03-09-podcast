@@ -15,26 +15,31 @@ fi
 
 rm -f /tmp/cc-skill-check.lock
 
-# Stash current state, create fake diff, restore after
-# Save the current HEAD so we can get back
+# Back up learned-rules (skill-check will update it during eval)
+cp .claude/hooks/learned-rules.json /tmp/learned-rules-backup.json 2>/dev/null || true
+
+# Save current branch state
+ORIG_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 ORIG_HEAD=$(git rev-parse HEAD)
 
-# Remove from index (not disk), commit silently, re-add → staged diff shows full content
+# Create a throwaway branch for the eval
+git checkout -b eval-temp --no-track >/dev/null 2>&1
+
+# Remove test-violations from index, commit, re-add as new
 git rm --cached -r "$DIR" >/dev/null 2>&1
-git commit --no-verify -m "eval: temp remove" >/dev/null 2>&1
+git commit --no-verify -m "eval: temp" >/dev/null 2>&1
 git add "$DIR"
 
 COUNT=$(git diff --cached --stat -- "$DIR" | tail -1)
 echo "staged: $COUNT"
 
 cleanup() {
-  # Save learned-rules before resetting (skill-check may have updated it)
-  cp .claude/hooks/learned-rules.json /tmp/learned-rules-backup.json 2>/dev/null || true
-  git reset --soft "$ORIG_HEAD" >/dev/null 2>&1 || true
-  git checkout -- "$DIR" >/dev/null 2>&1 || true
   # Restore learned-rules
   cp /tmp/learned-rules-backup.json .claude/hooks/learned-rules.json 2>/dev/null || true
-  echo "✓ git state restored (learned-rules preserved)"
+  # Switch back to original branch, delete throwaway
+  git checkout "$ORIG_BRANCH" >/dev/null 2>&1 || true
+  git branch -D eval-temp >/dev/null 2>&1 || true
+  echo "✓ restored to $ORIG_BRANCH (learned-rules preserved)"
 }
 trap cleanup EXIT
 

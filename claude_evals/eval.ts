@@ -1,17 +1,30 @@
+#!/usr/bin/env bun
+/**
+ * CLAUDE.md eval server — hono server that runs eval agents via the SDK.
+ * Same pattern as skill-check-server: runs as a persistent process so
+ * query() inherits the authenticated session context.
+ *
+ * Start:  bun --watch claude_evals/eval.ts
+ * Run:    curl http://localhost:7484/run
+ * Health: curl http://localhost:7484/health
+ */
+
+import { Hono } from "hono"
 import { query, type SDKAssistantMessage } from "@anthropic-ai/claude-agent-sdk"
-import { resolve, dirname } from "path"
+import { resolve } from "path"
 
 // ── Config ──────────────────────────────────────────────────────────────────
-const PROJECT_ROOT = resolve(dirname(import.meta.dir))
+const PROJECT_ROOT = resolve(import.meta.dir, "..")
 const VARIANTS_DIR = resolve(import.meta.dir, "variants")
+const PORT = 7484
 const MODEL = "claude-opus-4-6"
 
-// Strip CLAUDE* env vars so child processes don't detect a parent session
+// Strip only CLAUDECODE (session marker) — keep everything else for auth
 const cleanEnv = Object.fromEntries(
-  Object.entries(process.env).filter(([k]) => !k.startsWith("CLAUDE"))
+  Object.entries(process.env).filter(([k]) => k !== "CLAUDECODE")
 )
 
-const log = (msg: string) => process.stderr.write(msg + "\n")
+const log = (msg: string) => console.log(`[eval] ${msg}`)
 
 // ── Tasks ───────────────────────────────────────────────────────────────────
 const tasks = [
@@ -46,17 +59,14 @@ async function runEval(
   task: typeof tasks[0]
 ): Promise<{ variant: string; task: string; messages: string[]; cost: number }> {
   const messages: string[] = []
-  log(`  [start] ${variantName} / ${task.id}`)
+  log(`[start] ${variantName} / ${task.id}`)
 
   const conversation = query({
     prompt: task.prompt,
     options: {
-      // cwd = variant dir so CLAUDE.md loads from there
       cwd: variantDir,
-      // project files accessible via additionalDirectories
       additionalDirectories: [PROJECT_ROOT],
       model: MODEL,
-      // Load user + project settings (project = CLAUDE.md from cwd)
       settingSources: ["user", "project"],
       tools: ["Read", "Edit", "Glob", "Grep", "Bash"],
       allowedTools: ["Read", "Edit", "Glob", "Grep", "Bash"],
@@ -146,7 +156,6 @@ Respond with ONLY valid JSON, no markdown fences:
   }
 
   try {
-    // Strip markdown fences if present
     const jsonStr = resultText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
     const parsed = JSON.parse(jsonStr)
     const scores = parsed.scores as Record<string, { pass: boolean; reason: string }>
@@ -158,23 +167,21 @@ Respond with ONLY valid JSON, no markdown fences:
     }
     return { scores, total, max }
   } catch {
-    log(`  [warn] Grader returned invalid JSON: ${resultText.slice(0, 300)}`)
+    log(`[warn] Grader returned invalid JSON: ${resultText.slice(0, 300)}`)
     return { scores: {}, total: 0, max: rubric.reduce((a, r) => a + r.weight, 0) }
   }
 }
 
-// ── Main ────────────────────────────────────────────────────────────────────
-async function main() {
+// ── Run all evals ───────────────────────────────────────────────────────────
+async function runAllEvals() {
   const variants = [
     { name: "original", dir: resolve(VARIANTS_DIR, "original") },
     { name: "improved", dir: resolve(VARIANTS_DIR, "improved") },
   ]
 
-  log(`Running ${variants.length} variants x ${tasks.length} tasks = ${variants.length * tasks.length} evals`)
-  log(`Model: ${MODEL}`)
-  log(`Project root: ${PROJECT_ROOT}\n`)
+  log(`${variants.length} variants x ${tasks.length} tasks = ${variants.length * tasks.length} evals`)
+  log(`model: ${MODEL} | project: ${PROJECT_ROOT}`)
 
-  // Build all eval runs
   const evalRuns = variants.flatMap((v) =>
     tasks.map((task) => ({ ...v, task }))
   )
@@ -183,29 +190,30 @@ async function main() {
   const results = await Promise.all(
     evalRuns.map(async ({ name, dir, task }) => {
       const evalResult = await runEval(name, dir, task)
-      log(`  [done] ${name} / ${task.id} — ${evalResult.messages.length} msgs, $${evalResult.cost.toFixed(3)}`)
+      log(`[done] ${name} / ${task.id} — ${evalResult.messages.length} msgs, $${evalResult.cost.toFixed(3)}`)
 
       const gradeResult = await grade(
         evalResult.messages,
         task.rubric,
         resolve(dir, "CLAUDE.md"),
       )
-      log(`  [graded] ${name} / ${task.id} — ${gradeResult.total}/${gradeResult.max}`)
+      log(`[graded] ${name} / ${task.id} — ${gradeResult.total}/${gradeResult.max}`)
 
       return { ...evalResult, grade: gradeResult }
     })
   )
 
-  // ── Report ──────────────────────────────────────────────────────────────
-  console.log("\n" + "=".repeat(70))
-  console.log("RESULTS")
-  console.log("=".repeat(70))
-
+  // ── Build report ────────────────────────────────────────────────────────
+  const lines: string[] = []
   const summaryByVariant: Record<string, { total: number; max: number }> = {}
 
+  lines.push("=" .repeat(70))
+  lines.push("RESULTS")
+  lines.push("=".repeat(70))
+
   for (const r of results) {
-    console.log(`\n## ${r.variant} / ${r.task}  ($${r.cost.toFixed(3)})`)
-    console.log("-".repeat(50))
+    lines.push(`\n## ${r.variant} / ${r.task}  ($${r.cost.toFixed(3)})`)
+    lines.push("-".repeat(50))
 
     if (!summaryByVariant[r.variant]) summaryByVariant[r.variant] = { total: 0, max: 0 }
     summaryByVariant[r.variant].total += r.grade.total
@@ -213,21 +221,49 @@ async function main() {
 
     for (const [id, score] of Object.entries(r.grade.scores)) {
       const icon = score.pass ? "PASS" : "FAIL"
-      console.log(`  ${icon}  ${id}: ${score.reason}`)
+      lines.push(`  ${icon}  ${id}: ${score.reason}`)
     }
-    console.log(`  Score: ${r.grade.total}/${r.grade.max}`)
+    lines.push(`  Score: ${r.grade.total}/${r.grade.max}`)
   }
 
-  console.log("\n" + "=".repeat(70))
-  console.log("SUMMARY")
-  console.log("=".repeat(70))
+  lines.push("\n" + "=".repeat(70))
+  lines.push("SUMMARY")
+  lines.push("=".repeat(70))
   for (const [variant, summary] of Object.entries(summaryByVariant)) {
     const pct = ((summary.total / summary.max) * 100).toFixed(0)
-    console.log(`  ${variant}: ${summary.total}/${summary.max} (${pct}%)`)
+    lines.push(`  ${variant}: ${summary.total}/${summary.max} (${pct}%)`)
   }
 
   const totalCost = results.reduce((a, r) => a + r.cost, 0)
-  console.log(`\nTotal cost: $${totalCost.toFixed(3)}`)
+  lines.push(`\nTotal cost: $${totalCost.toFixed(3)}`)
+
+  const report = lines.join("\n")
+  log("eval complete")
+  return { results, report }
 }
 
-main().catch(console.error)
+// ── Hono server ─────────────────────────────────────────────────────────────
+const app = new Hono()
+
+let running = false
+
+app.get("/run", async (c) => {
+  if (running) return c.json({ error: "eval already running" }, 409)
+  running = true
+  try {
+    const { report } = await runAllEvals()
+    return c.text(report)
+  } catch (e) {
+    log(`error: ${e}`)
+    return c.json({ error: String(e) }, 500)
+  } finally {
+    running = false
+  }
+})
+
+app.get("/health", (c) => c.json({ ok: true }))
+
+log(`server on :${PORT}`)
+log(`curl http://localhost:${PORT}/run to start eval`)
+const server = { port: PORT, fetch: app.fetch }
+export default server
