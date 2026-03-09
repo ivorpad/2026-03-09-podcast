@@ -1,57 +1,22 @@
 [
   {
-    "pattern": "const\\s+\\w+\\s*:\\s*any\\s*=\\s*await\\s+db\\.",
-    "filePattern": "\\.ts$",
-    "message": "[drizzle-best-practices] Using `: any` type annotation on Drizzle query results defeats the type safety that Drizzle provides → Remove the `: any` annotation and let TypeScript infer the type from Drizzle, or use `typeof deals.$inferSelect[]` for explicit typing",
-    "skill": "drizzle-best-practices",
-    "createdAt": "2026-03-09T20:07:45.132Z"
-  },
-  {
-    "pattern": "const\\s+\\w+\\s*:\\s*any\\s*=\\s*JSON\\.parse",
-    "filePattern": "\\.tsx?$",
-    "message": "[typescript-best-practices] Use unknown instead of any - using 'any' disables all type checking → Change 'const raw: any' to 'const raw: unknown' and narrow the type with schema.parse() result, or let the schema result be the typed value",
-    "skill": "typescript-best-practices",
-    "createdAt": "2026-03-09T20:07:45.132Z"
-  },
-  {
     "pattern": ":\\s*any\\s*=",
     "filePattern": "\\.tsx?$",
-    "message": "[typescript-best-practices] Use unknown instead of any - using 'any' disables all type checking → Remove the explicit ': any' annotation and let TypeScript infer the type from the db query, or use a proper type definition",
+    "message": "[typescript-best-practices] Never use 'any' type annotation → Let TypeScript infer, use 'unknown' with type guards, or use a proper type definition",
     "skill": "typescript-best-practices",
     "createdAt": "2026-03-09T20:07:45.132Z"
   },
   {
     "pattern": "throw new Error\\(",
     "filePattern": "routers/",
-    "message": "[drizzle-best-practices] Using generic Error instead of TRPCError in router loses structured error handling → Use throw new TRPCError({ code: 'NOT_FOUND', message: 'Contact not found' }) to maintain consistent error handling",
+    "message": "[drizzle-best-practices] Using generic Error instead of TRPCError in router loses structured error handling → Use throw new TRPCError({ code: 'NOT_FOUND', message: '...' })",
     "skill": "drizzle-best-practices",
     "createdAt": "2026-03-09T20:07:56.974Z"
-  },
-  {
-    "pattern": "const\\s+\\w+:\\s*any\\s*=\\s*JSON\\.parse",
-    "filePattern": "\\.ts$",
-    "message": "[drizzle-best-practices] Using : any instead of : unknown or typed schema reduces type safety → Use : unknown and validate with schema.parse(), or type the result properly after validation",
-    "skill": "drizzle-best-practices",
-    "createdAt": "2026-03-09T20:07:56.974Z"
-  },
-  {
-    "pattern": "const\\s+\\w+\\s*:\\s*any\\s*=",
-    "filePattern": "routers/",
-    "message": "[typescript-best-practices] Using 'any' type annotation on variable declaration → Remove explicit ': any' and let TypeScript infer, or use ': unknown' with proper type guards",
-    "skill": "typescript-best-practices",
-    "createdAt": "2026-03-09T20:07:56.974Z"
-  },
-  {
-    "pattern": ":\\s*any\\s*=\\s*await\\s+db",
-    "filePattern": "routers/",
-    "message": "[typescript-best-practices] Use unknown instead of any - NEVER use any → Change `const contactDeals: any` to `const contactDeals = await db...` letting TypeScript infer the type, or use a proper type annotation",
-    "skill": "typescript-best-practices",
-    "createdAt": "2026-03-09T20:08:48.676Z"
   },
   {
     "pattern": "<script[\\s>][^>]*dangerouslySetInnerHTML(?!.*\\bid\\b)",
     "filePattern": "\\.tsx$",
-    "message": "[next-best-practices] Inline script missing id attribute - per scripts.md, inline scripts require an id attribute for Next.js to track them → Add an id attribute to the inline script: <script id=\"theme-init\" dangerouslySetInnerHTML={{ ... }} />",
+    "message": "[next-best-practices] Inline script missing id attribute → Add id for Next.js to track it: <script id=\"...\" dangerouslySetInnerHTML={{ ... }} />",
     "skill": "next-best-practices",
     "createdAt": "2026-03-09T20:20:06.254Z"
   }

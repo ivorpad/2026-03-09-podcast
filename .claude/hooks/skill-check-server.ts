@@ -202,9 +202,8 @@ async function reviewSkill(
   coveredRules: LearnedRule[]
 ): Promise<Violation[]> {
   const skillDir = `.claude/skills/${skillName}`;
-  const skillRules = coveredRules.filter((r) => r.skill === skillName);
-  const skipSection = skillRules.length > 0
-    ? `\n\nThese patterns are ALREADY covered by automated lint rules — do NOT flag them:\n${skillRules.map((r) => `- ${r.message}`).join("\n")}\n`
+  const skipSection = coveredRules.length > 0
+    ? `\n\nThese patterns are ALREADY covered by automated lint rules (across ALL skills) — do NOT flag violations that overlap with ANY of these, even if from a different skill:\n${coveredRules.map((r) => `- ${r.message}`).join("\n")}\n`
     : "";
 
   let text = "";
@@ -226,7 +225,10 @@ Output your verdict as JSON on its own line prefixed with VERDICT:
 - No violations: VERDICT: {"ok": true}
 - Violations: VERDICT: {"ok": false, "violations": [{"file": "path", "skill": "${skillName}", "rule": "what was violated", "fix": "how to fix", "pattern": "grep -E regex to detect this violation", "filePattern": "regex matching file paths this applies to"}]}
 
-IMPORTANT: "pattern" must be a valid grep -E regex that catches this violation in source code. "filePattern" should match file paths (e.g. "\\\\.tsx?$", "routers/", "db/").`,
+IMPORTANT rules for violations:
+- "pattern" must be a valid grep -E regex that catches this violation in source code. "filePattern" should match file paths (e.g. "\\\\.tsx?$", "routers/", "db/").
+- Do NOT emit a violation if an existing learned rule (listed above) already covers the same concept, even if your regex would be slightly different. For example, if there's already a rule catching ": any", don't add another variant of "no any". Deduplicate by INTENT, not by exact regex.
+- Prefer broad, reusable patterns over narrow ones. One rule catching all ": any" is better than separate rules for "any = await db", "any = JSON.parse", etc.`,
     options: {
       cwd,
       maxTurns: 6,
