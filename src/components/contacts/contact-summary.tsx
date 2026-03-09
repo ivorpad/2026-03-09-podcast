@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { SparklesIcon } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import type { ContactSummary } from "@/shared/schemas";
+import { contactSummarySchema, type ContactSummary } from "@/shared/schemas";
 
 export function ContactSummaryCard({
   contactId,
@@ -27,7 +27,7 @@ export function ContactSummaryCard({
   });
 
   const parsed: ContactSummary | null = existingSummary
-    ? JSON.parse(existingSummary)
+    ? contactSummarySchema.parse(JSON.parse(existingSummary))
     : null;
 
   return (

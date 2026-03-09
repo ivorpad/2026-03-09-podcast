@@ -7,6 +7,7 @@ CRM — a demo CRM built with agent-first harness engineering.
 - `pnpm dev` — starts dev server on port 3005
 - `pnpm db:migrate` — run database migrations
 - `pnpm lint` — run linter
+- Port: 3005
 
 ## Stack
 
@@ -16,6 +17,18 @@ CRM — a demo CRM built with agent-first harness engineering.
 - **UI:** shadcn/ui (Base UI), Tailwind CSS v4, Lucide icons
 - **AI:** Anthropic SDK (Claude Sonnet) for structured outputs
 - **Package manager:** `pnpm` (alias `pp`)
+
+## Subagents
+
+See [SUBAGENTS.md](./SUBAGENTS.md) for the full subagents workflow.
+
+**When to Use Subagents**:
+- Research tasks (e.g., "research best practices for memory management in C")
+- Exploration of alternative approaches
+- Parallel analysis of different components
+- Code review and testing of specific modules
+- Documentation generation
+- Debugging specific functions or modules
 
 ## Architecture
 

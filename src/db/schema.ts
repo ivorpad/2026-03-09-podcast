@@ -60,3 +60,10 @@ export const deals = sqliteTable("deals", {
     .notNull()
     .default(sql`(datetime('now'))`),
 });
+
+export type Company = typeof companies.$inferSelect;
+export type NewCompany = typeof companies.$inferInsert;
+export type Contact = typeof contacts.$inferSelect;
+export type NewContact = typeof contacts.$inferInsert;
+export type Deal = typeof deals.$inferSelect;
+export type NewDeal = typeof deals.$inferInsert;

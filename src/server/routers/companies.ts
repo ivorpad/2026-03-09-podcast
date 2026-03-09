@@ -24,7 +24,7 @@ export const companiesRouter = router({
         .limit(limit)
         .offset(offset);
       const [{ count }] = await db
-        .select({ count: sql<number>`count(*)` })
+        .select({ count: sql`count(*)`.mapWith(Number) })
         .from(companies);
       return { items: rows, total: count };
     }),

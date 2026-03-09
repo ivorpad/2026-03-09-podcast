@@ -37,7 +37,7 @@ export const contactsRouter = router({
         .limit(limit)
         .offset(offset);
       const [{ count }] = await db
-        .select({ count: sql<number>`count(*)` })
+        .select({ count: sql`count(*)`.mapWith(Number) })
         .from(contacts);
       return { items: rows, total: count };
     }),
@@ -86,16 +86,13 @@ export const contactsRouter = router({
     .input(contactUpdateSchema)
     .mutation(async ({ input }) => {
       const { id, ...data } = input;
-      const updateData: Record<string, unknown> = {
-        ...data,
-        updatedAt: sql`datetime('now')`,
-      };
-      if ("email" in data) {
-        updateData.email = data.email || null;
-      }
       const result = db
         .update(contacts)
-        .set(updateData)
+        .set({
+          ...data,
+          ...("email" in data ? { email: data.email || null } : {}),
+          updatedAt: sql`datetime('now')`,
+        })
         .where(eq(contacts.id, id))
         .returning()
         .get();

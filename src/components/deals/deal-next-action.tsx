@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { LightbulbIcon } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import type { DealNextAction } from "@/shared/schemas";
+import { dealNextActionSchema, type DealNextAction } from "@/shared/schemas";
 
 export function DealNextActionCard({
   dealId,
@@ -28,7 +28,7 @@ export function DealNextActionCard({
   });
 
   const parsed: DealNextAction | null = existingAction
-    ? JSON.parse(existingAction)
+    ? dealNextActionSchema.parse(JSON.parse(existingAction))
     : null;
 
   return (

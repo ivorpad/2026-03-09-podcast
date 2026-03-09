@@ -28,9 +28,14 @@ if [[ -f "$CACHE_DIR/$DIFF_HASH" ]]; then
 fi
 
 # If another check is already running, allow (don't queue up)
+# But treat locks older than 3 minutes as stale
 if [[ -f "$LOCK" ]]; then
-    echo "{}"
-    exit 0
+    LOCK_AGE=$(( $(date +%s) - $(stat -f %m "$LOCK" 2>/dev/null || echo 0) ))
+    if [[ "$LOCK_AGE" -lt 180 ]]; then
+        echo "{}"
+        exit 0
+    fi
+    rm -f "$LOCK"
 fi
 
 # Quick health check — if server isn't running, allow

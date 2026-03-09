@@ -49,7 +49,7 @@ export function ContactForm({
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
       for (const issue of result.error.issues) {
-        fieldErrors[issue.path[0] as string] = issue.message;
+        fieldErrors[String(issue.path[0])] = issue.message;
       }
       setErrors(fieldErrors);
       toast.error("Please fix the validation errors");

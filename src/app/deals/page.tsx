@@ -155,7 +155,7 @@ export default function DealsPage() {
                     <TableCell>
                       <Badge
                         variant={
-                          stageBadgeVariant[deal.stage as DealStage] ?? "outline"
+                          stageBadgeVariant[deal.stage] ?? "outline"
                         }
                       >
                         {deal.stage}
@@ -180,7 +180,7 @@ export default function DealsPage() {
                               id: deal.id,
                               title: deal.title,
                               value: deal.value ?? undefined,
-                              stage: deal.stage as DealCreate["stage"],
+                              stage: deal.stage,
                               contactId: deal.contactId ?? undefined,
                               companyId: deal.companyId ?? undefined,
                               notes: deal.notes ?? "",
@@ -322,7 +322,7 @@ export default function DealsPage() {
                   <p className="text-sm font-medium text-muted-foreground">Stage</p>
                   <Badge
                     variant={
-                      stageBadgeVariant[dealDetail.data.stage as DealStage] ??
+                      stageBadgeVariant[dealDetail.data.stage] ??
                       "outline"
                     }
                   >

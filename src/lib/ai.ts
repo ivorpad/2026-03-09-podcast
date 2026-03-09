@@ -26,7 +26,7 @@ export async function generateStructuredOutput<T>(
     jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
   }
 
-  const raw = JSON.parse(jsonStr);
+  const raw: unknown = JSON.parse(jsonStr);
 
   // The harness: validate AI output against our Zod schema
   const parsed = schema.parse(raw);

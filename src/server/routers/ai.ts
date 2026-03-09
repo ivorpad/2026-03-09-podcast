@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
 import { db } from "@/db";
 import { contacts, deals } from "@/db/schema";
@@ -18,7 +19,7 @@ export const aiRouter = router({
         .select()
         .from(contacts)
         .where(eq(contacts.id, contactId));
-      if (!contact) throw new Error("Contact not found");
+      if (!contact) throw new TRPCError({ code: "NOT_FOUND", message: "Contact not found" });
 
       const contactDeals = await db
         .select()
@@ -70,7 +71,7 @@ Return JSON with: { "summary": "brief paragraph", "keyInsights": ["insight1", "i
         .select()
         .from(deals)
         .where(eq(deals.id, dealId));
-      if (!deal) throw new Error("Deal not found");
+      if (!deal) throw new TRPCError({ code: "NOT_FOUND", message: "Deal not found" });
 
       const prompt = `Based on this CRM deal, suggest the next best action.
 
@@ -108,7 +109,7 @@ Return JSON with: { "action": "specific next step", "priority": "low" | "medium"
         .select()
         .from(contacts)
         .where(eq(contacts.id, contactId));
-      if (!contact) throw new Error("Contact not found");
+      if (!contact) throw new TRPCError({ code: "NOT_FOUND", message: "Contact not found" });
 
       const prompt = `Based on the following contact information, suggest enrichment data.
 

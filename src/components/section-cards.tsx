@@ -10,6 +10,13 @@ import {
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 
+const formatCompact = (val: number) => {
+  if (val >= 1_000_000)
+    return `$${(val / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`
+  if (val >= 1000) return `$${(val / 1000).toFixed(1).replace(/\.0$/, "")}k`
+  return `$${val}`
+}
+
 export function SectionCards() {
   const contacts = trpc.contacts.list.useQuery()
   const companies = trpc.companies.list.useQuery()
@@ -25,13 +32,6 @@ export function SectionCards() {
   )
   const wonDeals = allDeals.filter((d) => d.stage === "closed-won")
   const wonValue = wonDeals.reduce((sum, d) => sum + (d.value ?? 0), 0)
-
-  const formatCompact = (val: number) => {
-    if (val >= 1_000_000)
-      return `$${(val / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`
-    if (val >= 1000) return `$${(val / 1000).toFixed(1).replace(/\.0$/, "")}k`
-    return `$${val}`
-  }
 
   const stats = [
     {

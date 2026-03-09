@@ -1,16 +1,29 @@
 # Hooks Architecture
 
 ## Skill Check Hook
-Reviews git diffs against `.claude/skills/` guidelines using a Haiku agent.
+Reviews git diffs against `.claude/skills/` guidelines using sub-agents per skill.
 
 ### Components
-1. **`.claude/hooks/skill-check.sh`** — Shell hook (Stop event). Curls the server. If server is down, returns `{}` (allow).
-2. **`.claude/hooks/skill-check-server.ts`** — Bun+Hono server on port 7483. Accepts `POST /check {cwd}`, runs `query()` with Haiku to review diff against skills.
+1. **`.claude/hooks/skill-check.sh`** — Shell hook (Stop event). Curls the server. If server is down, returns `{}` (allow). Caches by diff hash. Stale locks auto-expire after 3 minutes.
+2. **`.claude/hooks/skill-check-server.ts`** — Bun+Hono server on port 7483. Accepts `POST /check {cwd}`.
 
 ### How it runs
 - `pnpm dev` starts both Next.js and the skill-check server concurrently
-- The server uses `@anthropic-ai/claude-agent-sdk` `query()` to spawn a Haiku agent
-- Agent uses Bash/Read/Glob tools to: git diff → discover skills → read references → review
+- Server gets diff once via `Bun.spawnSync`, extracts changed file paths
+- **Smart skill matching**: maps changed files to relevant skills only (e.g. `.tsx` → react, `routers/` → trpc)
+- Spawns one `query()` sub-agent per relevant skill (not all 7 every time)
+- Concurrency limit of 2 to prevent claude process crashes
+- Each sub-agent reads SKILL.md + references, reviews diff, returns VERDICT JSON
+- Per-skill error handling: one crash doesn't kill the whole check
+
+### Skill Matchers
+- `typescript-best-practices` → `.ts`, `.tsx` files
+- `next-best-practices` → `src/app/`, `next.config`
+- `vercel-react-best-practices` → `.tsx`, `.jsx` files
+- `trpc-type-safety` → `trpc`, `routers/`
+- `drizzle-best-practices` → `db/`, `schema`, `drizzle`
+- `shadcn` → `components/ui/`, `components.json`
+- `building-components` → `components/` (not `components/ui/`)
 
 ### Why a server (not inline)
 - **Recursion prevention**: `query()` spawns `claude` which loads project hooks. If the hook itself called `query()`, it would recurse infinitely.
@@ -32,6 +45,10 @@ Agent SDK `query()` with:
 - `settingSources`: `[]` (default — no project config loaded)
 - Agent reads skills manually via file tools
 - Server runs as separate process, hook just curls it
+
+### Known issues
+- Agent SDK `query()` can crash with exit code 1 when too many concurrent processes. Fixed with concurrency limit of 2 + `process.on("uncaughtException")`.
+- Lock file cleanup via `trap EXIT` is unreliable when Claude Code kills the hook. Fixed with 3-minute stale lock expiry.
 
 ## Other Hooks
 - **`.claude/hooks/file-size-guard.sh`** — Guards against large files
