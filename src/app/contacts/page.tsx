@@ -4,7 +4,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
+
 import {
   Dialog,
   DialogContent,
@@ -21,8 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ContactForm } from "@/components/contacts/contact-form";
-import { ContactSummaryCard } from "@/components/contacts/contact-summary";
-import { ContactEnrichmentCard } from "@/components/contacts/contact-enrichment";
+import { ContactDetailDialog } from "@/components/contacts/contact-detail-dialog";
 import type { ContactCreate } from "@/shared/schemas";
 import { toast } from "sonner";
 import { PlusIcon, PencilIcon, TrashIcon, EyeIcon } from "lucide-react";
@@ -204,83 +203,14 @@ export default function ContactsPage() {
       </Dialog>
 
       {/* View Contact Detail Dialog */}
-      <Dialog
+      <ContactDetailDialog
         open={viewingId !== null}
         onOpenChange={(open) => {
           if (!open) setViewingId(null);
         }}
-      >
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {contactDetail.data
-                ? `${contactDetail.data.firstName} ${contactDetail.data.lastName}`
-                : "Loading..."}
-            </DialogTitle>
-            <DialogDescription>Contact details and AI features</DialogDescription>
-          </DialogHeader>
-          {contactDetail.isLoading ? (
-            <div className="flex flex-col gap-3">
-              <Skeleton className="h-20 w-full" />
-              <Skeleton className="h-32 w-full" />
-            </div>
-          ) : contactDetail.data ? (
-            <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Email</p>
-                  <p>{contactDetail.data.email ?? "-"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Phone</p>
-                  <p>{contactDetail.data.phone ?? "-"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Company</p>
-                  <p>{contactDetail.data.companyName ?? "-"}</p>
-                </div>
-                {contactDetail.data.notes && (
-                  <div className="col-span-2">
-                    <p className="text-sm font-medium text-muted-foreground">Notes</p>
-                    <p>{contactDetail.data.notes}</p>
-                  </div>
-                )}
-              </div>
-
-              {contactDetail.data.deals &&
-                contactDetail.data.deals.length > 0 && (
-                  <>
-                    <Separator />
-                    <div>
-                      <h4 className="text-sm font-medium mb-2">
-                        Related Deals
-                      </h4>
-                      <div className="flex flex-col gap-1">
-                        {contactDetail.data.deals.map((deal) => (
-                          <div
-                            key={deal.id}
-                            className="text-sm flex justify-between"
-                          >
-                            <span>{deal.title}</span>
-                            <span className="text-muted-foreground">
-                              {deal.stage} &middot; <span className="font-mono">${deal.value ?? 0}</span>
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-              <ContactSummaryCard
-                contactId={contactDetail.data.id}
-                existingSummary={contactDetail.data.aiSummary}
-              />
-              <ContactEnrichmentCard contactId={contactDetail.data.id} />
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+        contact={contactDetail.data ?? null}
+        isLoading={contactDetail.isLoading}
+      />
     </div>
   );
 }

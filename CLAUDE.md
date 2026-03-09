@@ -51,6 +51,10 @@ Three AI features: contact summary, deal next-action, contact enrichment.
 - No backward compatibility — pre-users MVP, just refactor directly
 - No migration/compat code, no feature flags, no shims
 
+## Links
+
+- When the user pastes a URL and asks something about it, ALWAYS fetch/read the link first before acting. Don't guess — read the actual content.
+
 ## Workflow
 
 - Run after every change (tests, dev server, etc.)

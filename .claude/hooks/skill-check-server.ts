@@ -72,17 +72,27 @@ const preToolUseHook = {
   }],
 };
 
+// Provider config — SKILL_CHECK_PROVIDER: "alibaba" | "openrouter" | "anthropic"
+const PROVIDERS: Record<string, { baseUrl: string; token: string | undefined; model: string }> = {
+  alibaba: { baseUrl: "https://coding-intl.dashscope.aliyuncs.com/apps/anthropic", token: process.env.ANTHROPIC_AUTH_TOKEN, model: "qwen3.5-plus" },
+  openrouter: { baseUrl: "https://openrouter.ai/api", token: process.env.OPENROUTER_API_KEY ?? process.env.ANTHROPIC_AUTH_TOKEN, model: process.env.SKILL_CHECK_MODEL ?? "qwen/qwen-plus" },
+  anthropic: { baseUrl: process.env.ANTHROPIC_BASE_URL ?? "https://api.anthropic.com", token: process.env.ANTHROPIC_AUTH_TOKEN, model: process.env.SKILL_CHECK_MODEL ?? "claude-sonnet-4-20250514" },
+};
+const provider = PROVIDERS[process.env.SKILL_CHECK_PROVIDER ?? "alibaba"] ?? PROVIDERS.alibaba;
+console.log(`[skill-check] provider: ${process.env.SKILL_CHECK_PROVIDER ?? "alibaba"} (${provider.model})`);
+
 const baseEnv = {
   ...Object.fromEntries(
     Object.entries(process.env).filter(([k]) => !k.startsWith("CLAUDE"))
   ),
-  ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN,
-  ANTHROPIC_BASE_URL: 'https://coding-intl.dashscope.aliyuncs.com/apps/anthropic',
-  ANTHROPIC_MODEL: 'qwen3.5-plus',
+  ANTHROPIC_AUTH_TOKEN: provider.token,
+  ANTHROPIC_API_KEY: PROVIDERS[process.env.SKILL_CHECK_PROVIDER ?? "alibaba"] === PROVIDERS.openrouter ? "" : provider.token,
+  ANTHROPIC_BASE_URL: provider.baseUrl,
+  ANTHROPIC_MODEL: provider.model,
 };
 
 type Violation = { file: string; skill: string; rule: string; fix: string; pattern?: string; filePattern?: string };
-type LearnedRule = { pattern: string; filePattern: string; message: string; skill: string; createdAt: string };
+type LearnedRule = { pattern: string; filePattern: string; message: string; skill: string; createdAt: string; llmOnly?: boolean };
 
 const RULES_PATH = join(import.meta.dir, "learned-rules.json");
 
@@ -100,23 +110,23 @@ async function saveRules(rules: LearnedRule[]): Promise<void> {
 }
 
 function violationToRule(v: Violation): LearnedRule | null {
-  // AI provides pattern + filePattern directly in the violation
-  if (!v.pattern) return null;
-  // Validate it's a usable regex
-  try {
-    new RegExp(v.pattern);
-  } catch {
-    return null;
-  }
-  return {
-    pattern: v.pattern,
-    filePattern: v.filePattern ?? "\\.tsx?$",
-    message: `[${v.skill}] ${v.rule} → ${v.fix}`,
-    skill: v.skill,
-    createdAt: new Date().toISOString(),
-  };
-}
+  const message = `[${v.skill}] ${v.rule} → ${v.fix}`;
+  const filePattern = v.filePattern ?? "\\.tsx?$";
 
+  // If AI provided a regex pattern, validate it
+  if (v.pattern) {
+    try {
+      new RegExp(v.pattern);
+    } catch {
+      // Bad regex — fall through to LLM-only
+      return { pattern: "", filePattern, message, skill: v.skill, createdAt: new Date().toISOString(), llmOnly: true };
+    }
+    return { pattern: v.pattern, filePattern, message, skill: v.skill, createdAt: new Date().toISOString() };
+  }
+
+  // No pattern — structural violation, store as LLM-only
+  return { pattern: "", filePattern, message, skill: v.skill, createdAt: new Date().toISOString(), llmOnly: true };
+}
 
 type DiffFile = { path: string; content: string };
 
@@ -143,7 +153,6 @@ function testPattern(pattern: string, files: DiffFile[], filePattern?: string): 
   const fp = filePattern ? new RegExp(filePattern) : null;
   return files.some((f) => (!fp || fp.test(f.path)) && regex.test(f.content));
 }
-
 
 async function dedupWithLLM(
   candidates: LearnedRule[],
@@ -201,20 +210,28 @@ If none should be kept: KEEP: []`;
 
 async function graduateViolations(violations: Violation[], diff: string): Promise<number> {
   const existing = await loadRules();
-  const existingPatterns = new Set(existing.map((r) => r.pattern));
+  const existingMessages = new Set(existing.map((r) => r.message));
+  const existingPatterns = new Set(existing.filter((r) => !r.llmOnly).map((r) => r.pattern));
   const files = parseDiffFiles(diff);
 
-  // Phase 1: validate — must have valid regex that matches the diff
   const candidates: LearnedRule[] = [];
   for (const v of violations) {
     const rule = violationToRule(v);
     if (!rule) continue;
-    if (existingPatterns.has(rule.pattern)) continue;
-    if (!testPattern(rule.pattern, files, rule.filePattern)) {
-      console.log(`[skill-check] rejected (no match): ${rule.pattern}`);
-      continue;
+    // Skip exact duplicates
+    if (existingMessages.has(rule.message)) continue;
+    if (rule.llmOnly) {
+      // LLM-only rules: no regex validation, just dedup
+      candidates.push(rule);
+    } else {
+      // Regex rules: must match the actual diff
+      if (existingPatterns.has(rule.pattern)) continue;
+      if (!testPattern(rule.pattern, files, rule.filePattern)) {
+        console.log(`[skill-check] rejected (no match): ${rule.pattern}`);
+        continue;
+      }
+      candidates.push(rule);
     }
-    candidates.push(rule);
   }
 
   if (candidates.length === 0) return 0;
@@ -226,7 +243,7 @@ async function graduateViolations(violations: Violation[], diff: string): Promis
 
   for (const rule of deduped) {
     existing.push(rule);
-    console.log(`[skill-check] graduated: ${rule.pattern}`);
+    console.log(`[skill-check] graduated: ${rule.llmOnly ? "LLM-ONLY" : rule.pattern} | ${rule.message.slice(0, 60)}`);
   }
 
   if (deduped.length > 0) await saveRules(existing);
@@ -242,8 +259,6 @@ function extractChangedFiles(diff: string): string[] {
   return files;
 }
 
-// Extract file_patterns from SKILL.md frontmatter or description
-// Skills should declare: `file_patterns: ["*.tsx", "routers/", "db/"]`
 async function loadSkillFilePatterns(cwd: string, skillName: string): Promise<string[]> {
   const skillMd = join(cwd, ".claude", "skills", skillName, "SKILL.md");
   try {
@@ -253,8 +268,7 @@ async function loadSkillFilePatterns(cwd: string, skillName: string): Promise<st
     if (match) {
       return match[1].split(",").map((s) => s.trim().replace(/["']/g, ""));
     }
-    // No file_patterns declared — skip this skill (require explicit opt-in)
-    console.log(`[skill-check] skill "${skillName}" has no file_patterns in SKILL.md — skipping`);
+      console.log(`[skill-check] skill "${skillName}" has no file_patterns in SKILL.md — skipping`);
     return [];
   } catch {
     return [];
@@ -300,8 +314,15 @@ async function reviewSkill(
   coveredRules: LearnedRule[]
 ): Promise<Violation[]> {
   const skillContent = await loadSkillContent(cwd, skillName);
-  const skipSection = coveredRules.length > 0
-    ? `\nALREADY COVERED (do NOT re-flag these):\n${coveredRules.map((r) => `- ${r.message}`).join("\n")}\n`
+  const regexRules = coveredRules.filter((r) => !r.llmOnly);
+  const llmRules = coveredRules.filter((r) => r.llmOnly && r.skill === skillName);
+
+  const skipSection = regexRules.length > 0
+    ? `\nALREADY COVERED BY REGEX (do NOT re-flag these):\n${regexRules.map((r) => `- ${r.message}`).join("\n")}\n`
+    : "";
+
+  const llmChecks = llmRules.length > 0
+    ? `\nLEARNED CHECKS (verify these EVERY time — they have no regex):\n${llmRules.map((r) => `- ${r.message}`).join("\n")}\n`
     : "";
 
   let text = "";
@@ -316,7 +337,7 @@ ${skillContent}
 \`\`\`diff
 ${diff}
 \`\`\`
-${skipSection}
+${skipSection}${llmChecks}
 ## Instructions
 
 Look at EVERY "Wrong" / "Anti-Pattern" / "Don't" example in the skill above. For each one, check if the diff contains that pattern. Be thorough — check every added line.
@@ -339,14 +360,15 @@ Common things to catch:
 
 Output JSON on its own line prefixed with VERDICT:
 - No violations: VERDICT: {"ok": true}
-- Violations: VERDICT: {"ok": false, "violations": [{"file": "path", "skill": "${skillName}", "rule": "short description", "fix": "how to fix", "pattern": "grep -E regex", "filePattern": "file path regex"}]}
+- Violations: VERDICT: {"ok": false, "violations": [{"file": "path", "skill": "${skillName}", "rule": "short description", "fix": "how to fix", "pattern": "grep -E regex or null if structural", "filePattern": "file path regex"}]}
 
 REGEX RULES (critical — patterns that don't match get rejected):
 - Patterns are tested against file content with newlines collapsed to spaces.
 - Use \\s+ or .* to bridge newlines. Do NOT use [^)]* or [^>]* (they break on JSX arrow functions).
 - Before emitting, find the EXACT substring in the diff your regex matches. No match = rejected.
 - "filePattern" matches file paths, e.g. "\\\\.tsx?$"
-- Prefer broad patterns. One rule for all \`as X\` is better than separate rules per type.`,
+- Prefer broad patterns. One rule for all \`as X\` is better than separate rules per type.
+- If a violation is STRUCTURAL and cannot be expressed as regex, set pattern to null. These become LLM-only rules.`,
     options: {
       cwd,
       maxTurns: 3,
@@ -390,7 +412,6 @@ REGEX RULES (critical — patterns that don't match get rejected):
   return [];
 }
 
-// Prevent SDK child process crashes from killing the server
 process.on("uncaughtException", (err) => {
   console.error(`[skill-check] uncaught:`, String(err).slice(0, 200));
 });
@@ -406,8 +427,7 @@ app.post("/check", async (c) => {
   if (!cwd) return c.json({ error: "missing cwd" }, 400);
 
   try {
-    // Get diff once
-    const unstaged = Bun.spawnSync(["git", "diff", "--no-color", "--", ".", ":!pnpm-lock.yaml", ":!*.db-wal", ":!*.db-shm", ":!*.db", ":!*.pyc"], { cwd });
+      const unstaged = Bun.spawnSync(["git", "diff", "--no-color", "--", ".", ":!pnpm-lock.yaml", ":!*.db-wal", ":!*.db-shm", ":!*.db", ":!*.pyc"], { cwd });
     const staged = Bun.spawnSync(["git", "diff", "--cached", "--no-color", "--", ".", ":!pnpm-lock.yaml", ":!*.db-wal", ":!*.db-shm", ":!*.db", ":!*.pyc"], { cwd });
     const diff = unstaged.stdout.toString() + staged.stdout.toString();
 
@@ -416,8 +436,7 @@ app.post("/check", async (c) => {
       return c.json({});
     }
 
-    // Detect which files changed → match to relevant skills only
-    const changedFiles = extractChangedFiles(diff);
+      const changedFiles = extractChangedFiles(diff);
     const allSkills = await discoverSkills(cwd);
     const relevantSkills = await matchSkills(cwd, allSkills, changedFiles);
 
@@ -426,12 +445,10 @@ app.post("/check", async (c) => {
       return c.json({});
     }
 
-    // Load existing learned rules so AI skips already-covered patterns
-    const coveredRules = await loadRules();
+      const coveredRules = await loadRules();
     console.log(`[skill-check] ${changedFiles.length} files changed → ${relevantSkills.length} skills: ${relevantSkills.join(", ")} (${coveredRules.length} rules already learned)`);
 
-    // Run sub-agents with limited concurrency
-    const CONCURRENCY = 2;
+      const CONCURRENCY = 2;
     const results: Violation[][] = [];
     for (let i = 0; i < relevantSkills.length; i += CONCURRENCY) {
       const batch = relevantSkills.slice(i, i + CONCURRENCY);
@@ -464,8 +481,7 @@ app.post("/check", async (c) => {
       lines.push("");
     }
     const message = lines.join("\n");
-    // Graduate violations into learned rules for next time
-    const graduated = await graduateViolations(allViolations, diff);
+      const graduated = await graduateViolations(allViolations, diff);
     if (graduated > 0) {
       console.log(`[skill-check] graduated ${graduated} new lint rules`);
     }

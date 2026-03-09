@@ -110,5 +110,26 @@
     "message": "[nextjs-app-router-patterns] Numeric count in conditional render renders 0 → Use {count > 0 && <X/>} or {count ? <X/> : null}",
     "skill": "nextjs-app-router-patterns",
     "createdAt": "2026-03-09T22:02:35.594Z"
+  },
+  {
+    "pattern": "const\\s+\\w+\\s*:\\s*Record<string,\\s*string>\\s*=",
+    "filePattern": "\\.tsx?$",
+    "message": "[typescript-best-practices] Record<string, string> allows any key - use specific union for exhaustive checking → Replace Record<string, string> with Record<Stage, string> where Stage is a union of expected keys: type Stage = 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'closed-won' | 'closed-lost'",
+    "skill": "typescript-best-practices",
+    "createdAt": "2026-03-09T22:24:34.237Z"
+  },
+  {
+    "pattern": "<button\\s+className=\"p-2\\s+rounded\\s+hover:bg-accent\"\\s+onClick",
+    "filePattern": "\\.tsx?$",
+    "message": "[building-components] Icon-only buttons missing aria-label → Add aria-label to each icon button: <button aria-label=\"Star\" ...>",
+    "skill": "building-components",
+    "createdAt": "2026-03-09T22:41:04.102Z"
+  },
+  {
+    "pattern": "useEffect\\(\\(\\)\\s*=>\\s*{\\s*const\\s+result\\s*=\\s*deals\\.filter",
+    "filePattern": "\\.tsx?$",
+    "message": "[building-components] useEffect to derive state that could be computed during render → Compute filteredDeals directly during render: const filteredDeals = deals.filter(...); Remove useState and useEffect",
+    "skill": "building-components",
+    "createdAt": "2026-03-09T22:41:04.102Z"
   }
 ]

@@ -1,24 +1,31 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { z } from "zod";
 
-const client = new Anthropic();
+const client = new OpenAI({
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+});
 
 export async function generateStructuredOutput<T>(
   prompt: string,
   schema: z.ZodType<T>,
   systemPrompt?: string
 ): Promise<T> {
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+  const completion = await client.chat.completions.create({
+    model: "qwen/qwen-plus",
     max_tokens: 1024,
-    system:
-      (systemPrompt ?? "You are a helpful CRM assistant.") +
-      "\n\nIMPORTANT: Respond ONLY with valid JSON matching the requested schema. No markdown, no code fences, no explanation.",
-    messages: [{ role: "user", content: prompt }],
+    messages: [
+      {
+        role: "system",
+        content:
+          (systemPrompt ?? "You are a helpful CRM assistant.") +
+          "\n\nIMPORTANT: Respond ONLY with valid JSON matching the requested schema. No markdown, no code fences, no explanation.",
+      },
+      { role: "user", content: prompt },
+    ],
   });
 
-  const text =
-    message.content[0].type === "text" ? message.content[0].text : "";
+  const text = completion.choices[0]?.message?.content ?? "";
 
   // Parse JSON from response - handle potential markdown code fences
   let jsonStr = text.trim();
