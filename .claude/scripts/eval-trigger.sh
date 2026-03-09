@@ -15,9 +15,6 @@ fi
 
 rm -f /tmp/cc-skill-check.lock
 
-# Back up learned-rules (skill-check will update it during eval)
-cp .claude/hooks/learned-rules.json /tmp/learned-rules-backup.json 2>/dev/null || true
-
 # Save current branch state
 ORIG_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 ORIG_HEAD=$(git rev-parse HEAD)
@@ -34,16 +31,20 @@ COUNT=$(git diff --cached --stat -- "$DIR" | tail -1)
 echo "staged: $COUNT"
 
 cleanup() {
-  # Restore learned-rules
-  cp /tmp/learned-rules-backup.json .claude/hooks/learned-rules.json 2>/dev/null || true
-  # Switch back to original branch, delete throwaway
+  # Save learned-rules from eval (skill-check may have graduated new rules)
+  cp .claude/hooks/learned-rules.json /tmp/learned-rules-eval.json 2>/dev/null || true
   git checkout "$ORIG_BRANCH" >/dev/null 2>&1 || true
   git branch -D eval-temp >/dev/null 2>&1 || true
-  echo "✓ restored to $ORIG_BRANCH (learned-rules preserved)"
+  # Restore graduated rules (git checkout may have overwritten them)
+  cp /tmp/learned-rules-eval.json .claude/hooks/learned-rules.json 2>/dev/null || true
+  echo "✓ restored to $ORIG_BRANCH"
 }
 trap cleanup EXIT
 
 echo "triggering skill-check..."
+# Truncate log so tail only shows new output
+truncate -s 0 /tmp/cc-skill-check-server.log 2>/dev/null || true
+
 curl -s -X POST "$SERVER/check" \
   -H 'Content-Type: application/json' \
   -d "{\"cwd\":\"$CWD\"}" &

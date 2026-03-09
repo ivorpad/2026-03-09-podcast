@@ -2,7 +2,7 @@
   {
     "pattern": ":\\s*any\\s*=",
     "filePattern": "\\.tsx?$",
-    "message": "[typescript-best-practices] Never use 'any' \u2192 Use 'unknown' with type guards or a proper type",
+    "message": "[typescript-best-practices] Never use 'any' → Use 'unknown' with type guards or a proper type",
     "skill": "typescript-best-practices",
     "createdAt": "2026-03-09T20:07:45.132Z"
   },
@@ -16,15 +16,36 @@
   {
     "pattern": "useEffect.*fetch\\(",
     "filePattern": "\\.tsx?$",
-    "message": "[nextjs-app-router-patterns] Don't fetch in useEffect \u2192 Use Server Components or React Query",
+    "message": "[nextjs-app-router-patterns] Don't fetch in useEffect → Use Server Components or React Query",
     "skill": "nextjs-app-router-patterns",
     "createdAt": "2026-03-09T20:52:30.822Z"
   },
   {
     "pattern": "\\.json\\(\\)\\s*\\.then",
     "filePattern": "\\.tsx?$",
-    "message": "[typescript-best-practices] fetch .json() returns any \u2192 Validate with Zod schema",
+    "message": "[typescript-best-practices] fetch .json() returns any → Validate with Zod schema",
     "skill": "typescript-best-practices",
     "createdAt": "2026-03-09T20:52:30.822Z"
+  },
+  {
+    "pattern": "window\\.location\\.search",
+    "filePattern": "\\.tsx?$",
+    "message": "[next-best-practices] Use useSearchParams() hook instead of window.location.search → Import and use useSearchParams() hook from next/navigation instead of manually parsing window.location.search",
+    "skill": "next-best-practices",
+    "createdAt": "2026-03-09T23:47:38.898Z"
+  },
+  {
+    "pattern": "useEffect.*filter",
+    "filePattern": "\\.tsx?$",
+    "message": "[next-best-practices] Avoid client-side data filtering when server-side filtering is possible → Move filtering logic to server component or use tRPC query parameters for server-side filtering",
+    "skill": "next-best-practices",
+    "createdAt": "2026-03-09T23:47:38.898Z"
+  },
+  {
+    "pattern": "lastContactedAt: text\\(",
+    "filePattern": "\\.ts$",
+    "message": "[drizzle-best-practices] Use proper timestamp type instead of text for date/time columns → Change text('last_contacted_at') to timestamp('last_contacted_at') or timestamp('last_contacted_at').withDefault(sql`now()`) for PostgreSQL",
+    "skill": "drizzle-best-practices",
+    "createdAt": "2026-03-09T23:48:38.944Z"
   }
 ]

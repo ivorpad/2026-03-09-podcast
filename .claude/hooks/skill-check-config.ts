@@ -22,7 +22,7 @@ const providers = {
   openrouter: {
     name: "openrouter",
     baseUrl: "https://openrouter.ai/api",
-    token: process.env.OPENROUTER_API_KEY ?? process.env.ANTHROPIC_AUTH_TOKEN ?? "",
+    token: process.env.OPENROUTER_API_KEY ?? "",
     model: "qwen/qwen-plus",
     emptyApiKey: true,
   },
@@ -36,7 +36,7 @@ const providers = {
 } satisfies Record<string, Provider>;
 
 // ---- CHANGE THIS TO SWITCH PROVIDER ----
-const ACTIVE: keyof typeof providers = "lmstudio";
+const ACTIVE: keyof typeof providers = "openrouter";
 // ----------------------------------------
 
 // Env override: SKILL_CHECK_PROVIDER=lmstudio

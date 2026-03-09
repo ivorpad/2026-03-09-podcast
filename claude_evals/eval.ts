@@ -19,10 +19,18 @@ const VARIANTS_DIR = resolve(import.meta.dir, "variants")
 const PORT = 7484
 const MODEL = "claude-opus-4-6"
 
-// Strip only CLAUDECODE (session marker) — keep everything else for auth
-const cleanEnv = Object.fromEntries(
-  Object.entries(process.env).filter(([k]) => k !== "CLAUDECODE")
-)
+// Load REAL_ANTHROPIC_API_KEY from .env, pass as ANTHROPIC_API_KEY to child
+const dotenv = await Bun.file(resolve(PROJECT_ROOT, ".env")).text()
+const realKey = dotenv.match(/REAL_ANTHROPIC_API_KEY="([^"]+)"/)?.[1] ?? ""
+
+// Strip CLAUDE* env vars (session markers cause silent exit in child),
+// inject the real API key for auth
+const cleanEnv = {
+  ...Object.fromEntries(
+    Object.entries(process.env).filter(([k]) => !k.startsWith("CLAUDE"))
+  ),
+  ANTHROPIC_API_KEY: realKey,
+}
 
 const log = (msg: string) => console.log(`[eval] ${msg}`)
 
@@ -238,7 +246,8 @@ async function runAllEvals() {
   lines.push(`\nTotal cost: $${totalCost.toFixed(3)}`)
 
   const report = lines.join("\n")
-  log("eval complete")
+  await Bun.write(resolve(import.meta.dir, "results.txt"), report)
+  log("eval complete — results in claude_evals/results.txt")
   return { results, report }
 }
 
@@ -261,9 +270,46 @@ app.get("/run", async (c) => {
   }
 })
 
+app.get("/test", async (c) => {
+  log("test: starting single query")
+  try {
+    const q = query({
+      prompt: "Say hello in one word",
+      options: {
+        settingSources: [],
+        tools: [],
+        permissionMode: "plan",
+        maxTurns: 1,
+        maxBudgetUsd: 0.10,
+        effort: "low",
+        persistSession: false,
+        env: cleanEnv,
+        stderr: (data: string) => log(`test:stderr: ${data.trim()}`),
+      },
+    })
+    let text = ""
+    for await (const msg of q) {
+      log(`test: msg type=${msg.type} ${msg.type === "result" ? msg.subtype + " $" + msg.total_cost_usd : ""}`)
+      if (msg.type === "assistant") {
+        const aMsg = msg as SDKAssistantMessage
+        for (const b of aMsg.message.content) {
+          if (b.type === "text") {
+            text += b.text
+            log(`test: text="${b.text.slice(0, 100)}"`)
+          }
+        }
+      }
+    }
+    return c.text(`OK: ${text}`)
+  } catch (e) {
+    log(`test: ERROR: ${e}`)
+    return c.text(`ERROR: ${e}`, 500)
+  }
+})
+
 app.get("/health", (c) => c.json({ ok: true }))
 
 log(`server on :${PORT}`)
 log(`curl http://localhost:${PORT}/run to start eval`)
-const server = { port: PORT, fetch: app.fetch }
+const server = { port: PORT, fetch: app.fetch, idleTimeout: 255 }
 export default server

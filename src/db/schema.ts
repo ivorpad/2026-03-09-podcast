@@ -25,6 +25,7 @@ export const contacts = sqliteTable("contacts", {
   companyId: integer("company_id").references(() => companies.id),
   notes: text("notes"),
   aiSummary: text("ai_summary"),
+  lastContactedAt: text("last_contacted_at"),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),

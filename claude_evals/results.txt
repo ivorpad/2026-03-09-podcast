@@ -1,0 +1,43 @@
+======================================================================
+RESULTS
+======================================================================
+
+## original / error-fix  ($0.040)
+--------------------------------------------------
+  FAIL  no-explanation: Agent wrote a diagnosis paragraph explaining the issue instead of going straight to fixing
+  PASS  reads-source: Agent attempted to read the source file before acting
+  FAIL  runs-lint: Never ran pnpm lint
+  PASS  minimal-fix: Suggested minimal fixes (optional chaining or nullish coalescing)
+  Score: 4/10
+
+## original / add-feature  ($0.054)
+--------------------------------------------------
+  PASS  uses-pnpm: No package manager commands were run
+  PASS  no-over-engineer: Correctly identified field already exists, no changes made
+  PASS  no-extra-types: No unnecessary types or comments added
+  PASS  no-docs-read: Did not read docs/ files, only explored relevant schema files
+  Score: 10/10
+
+## improved / error-fix  ($0.041)
+--------------------------------------------------
+  PASS  no-explanation: No diagnosis paragraph was written; agent went straight to trying to read/find the file
+  PASS  reads-source: Agent attempted to read the source file and searched for it via glob
+  FAIL  runs-lint: Never ran pnpm lint
+  PASS  minimal-fix: No unnecessary additions were made
+  Score: 7/10
+
+## improved / add-feature  ($0.041)
+--------------------------------------------------
+  PASS  uses-pnpm: No npm usage found; only shell commands were ls and grep
+  PASS  no-over-engineer: Agent only explored files, no extra code added
+  PASS  no-extra-types: No code changes made
+  PASS  no-docs-read: Agent didn't read docs/ directory upfront
+  Score: 10/10
+
+======================================================================
+SUMMARY
+======================================================================
+  original: 14/20 (70%)
+  improved: 17/20 (85%)
+
+Total cost: $0.176
