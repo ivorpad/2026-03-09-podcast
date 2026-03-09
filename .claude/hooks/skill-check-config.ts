@@ -31,6 +31,7 @@ const providers = {
     baseUrl: process.env.LMSTUDIO_URL ?? "http://localhost:1234",
     token: process.env.LMSTUDIO_API_KEY ?? "lm-studio",
     model: process.env.LMSTUDIO_MODEL ?? "qwen/qwen3.5-9b",
+    emptyApiKey: true,
   }
 } satisfies Record<string, Provider>;
 

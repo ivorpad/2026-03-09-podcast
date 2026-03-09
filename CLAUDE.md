@@ -53,14 +53,14 @@ Three AI features: contact summary, deal next-action, contact enrichment.
 
 ## Links
 
-- When the user pastes a URL and asks something about it, ALWAYS fetch/read the link first before acting. Don't guess — read the actual content.
+- When the user pastes a URL and asks something about it, ALWAYS fetch/read the link first before acting. Don't guess — read the actual content. If error, then STOP.
 
 ## Workflow
 
 - Run after every change (tests, dev server, etc.)
 - When an error is pasted, read the source, fix it, run it. Skip the explanation
 - "commit and push" is a single atomic action
-- When a screenshot is provided, find the visual bug and fix the code
+- When a screenshot is provided, diff it against the component, fix the CSS/markup and confirm visually
 
 ## Documentation Map
 
