@@ -18,11 +18,11 @@
 
 ## Active Execution Plans
 
-See [exec-plans/active/](./exec-plans/active/) for in-progress work.
+None currently in progress.
 
 ## Completed Plans
 
-See [exec-plans/completed/](./exec-plans/completed/) for past work.
+None yet.
 
 ## Technical Debt
 

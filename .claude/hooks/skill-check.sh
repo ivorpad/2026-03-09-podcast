@@ -28,8 +28,8 @@ fi
 if [[ -f "$RULES_FILE" ]]; then
     RULE_COUNT=$(jq 'length' "$RULES_FILE" 2>/dev/null || echo 0)
     if [[ "$RULE_COUNT" -gt 0 ]]; then
-        # Get changed lines from diff (only additions)
-        DIFF_CONTENT=$(git diff --no-color 2>/dev/null; git diff --cached --no-color 2>/dev/null)
+        # Get changed lines from diff (only additions), excluding test fixtures
+        DIFF_CONTENT=$(git diff --no-color -- ':!*test-violations/*' 2>/dev/null; git diff --cached --no-color -- ':!*test-violations/*' 2>/dev/null)
         ADDED_LINES=$(echo "$DIFF_CONTENT" | grep '^+' | grep -v '^+++' || true)
         CHANGED_FILES=$(echo "$DIFF_CONTENT" | grep '^diff --git' | sed 's/diff --git a\/\(.*\) b\/.*/\1/' || true)
 
@@ -41,15 +41,27 @@ if [[ -f "$RULES_FILE" ]]; then
 
             [[ -z "$PATTERN" || "$PATTERN" == "null" ]] && continue
 
-            # Check if any changed files match the filePattern
+            # Filter added lines to only those from files matching filePattern
+            RULE_LINES="$ADDED_LINES"
             if [[ -n "$FILE_MATCH" && "$FILE_MATCH" != "null" ]]; then
-                if ! echo "$CHANGED_FILES" | grep -qE "$FILE_MATCH" 2>/dev/null; then
-                    continue
-                fi
+                # Extract added lines only from matching files
+                RULE_LINES=""
+                CURRENT_FILE=""
+                while IFS= read -r line; do
+                    if [[ "$line" == "diff --git a/"* ]]; then
+                        CURRENT_FILE=$(echo "$line" | sed 's/diff --git a\/\(.*\) b\/.*/\1/')
+                    elif [[ "$line" == "+"* && "$line" != "+++"* ]]; then
+                        if echo "$CURRENT_FILE" | grep -qE "$FILE_MATCH" 2>/dev/null; then
+                            RULE_LINES="${RULE_LINES}${line}"$'\n'
+                        fi
+                    fi
+                done <<< "$DIFF_CONTENT"
+                # Skip rule if no matching files changed
+                [[ -z "$RULE_LINES" ]] && continue
             fi
 
             # Check if added lines match the violation pattern
-            if echo "$ADDED_LINES" | grep -qE "$PATTERN" 2>/dev/null; then
+            if echo "$RULE_LINES" | grep -qE "$PATTERN" 2>/dev/null; then
                 VIOLATIONS="${VIOLATIONS}- ${MESSAGE}\n"
             fi
         done

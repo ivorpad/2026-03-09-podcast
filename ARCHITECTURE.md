@@ -37,11 +37,11 @@ src/
 │   └── ai.ts        # Anthropic SDK wrapper (generateStructuredOutput)
 ├── components/      # React components
 │   ├── ui/          # shadcn/ui primitives
-│   ├── layout/      # Sidebar, shell
 │   ├── contacts/    # Contact-specific components
 │   ├── companies/   # Company-specific components
 │   ├── deals/       # Deal-specific components
-│   └── providers.tsx # tRPC + React Query + Theme providers
+│   ├── app-sidebar.tsx # App navigation sidebar
+│   └── providers.tsx   # tRPC + React Query + Theme providers
 └── app/             # Next.js App Router pages
     ├── layout.tsx    # Root layout (sidebar + main)
     ├── page.tsx      # Dashboard

@@ -17,6 +17,11 @@ if [[ ! -f "$FILE_PATH" ]]; then
     exit 0
 fi
 
+# Skip hook infrastructure files (contain rule patterns as strings)
+if [[ "$FILE_PATH" =~ \.claude/hooks/ ]]; then
+    exit 0
+fi
+
 cd "${CLAUDE_PROJECT_DIR:-.}"
 
 # Run eslint, capture output

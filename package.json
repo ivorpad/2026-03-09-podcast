@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3005 & bun run .claude/hooks/skill-check-server.ts & wait",
+    "dev": "next dev -p 3005 & bun --watch .claude/hooks/skill-check-server.ts & wait",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

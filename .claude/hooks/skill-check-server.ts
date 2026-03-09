@@ -117,99 +117,120 @@ function violationToRule(v: Violation): LearnedRule | null {
   };
 }
 
-// Extract key concepts from a rule message for semantic dedup
-function extractConcepts(message: string): Set<string> {
-  const normalized = message.toLowerCase().replace(/[^a-z0-9\s]/g, " ");
-  // Extract multi-word phrases and significant single words
-  const concepts = new Set<string>();
-  const phrases = [
-    "use client", "use server", "server component", "client component",
-    "use effect", "use state", "use reducer", "use context",
-    "fetch in", "loading state", "suspense", "skeleton",
-    "type guard", "type predicate", "type assertion",
-    "any type", "unknown type", "no any", "never use any",
-    "trpc error", "throw error", "error handling",
-    "dangerouslysetinnerhtml", "inline script",
-    "react query", "data fetching",
-  ];
-  for (const phrase of phrases) {
-    if (normalized.includes(phrase)) concepts.add(phrase);
-  }
-  // Also add the core violation verb+object (e.g. "missing directive", "hooks without")
-  const words = normalized.split(/\s+/).filter((w) => w.length > 4);
-  for (const w of words) concepts.add(w);
-  return concepts;
-}
 
-function isDuplicateByIntent(newMsg: string, existingMessages: string[]): boolean {
-  const newConcepts = extractConcepts(newMsg);
-  for (const existing of existingMessages) {
-    const existingConcepts = extractConcepts(existing);
-    // Count overlapping concepts
-    let overlap = 0;
-    for (const c of newConcepts) {
-      if (existingConcepts.has(c)) overlap++;
+type DiffFile = { path: string; content: string };
+
+function parseDiffFiles(diff: string): DiffFile[] {
+  const files: DiffFile[] = [];
+  let currentFile = "";
+  let currentLines: string[] = [];
+  for (const line of diff.split("\n")) {
+    const m = line.match(/^diff --git a\/(.+) b\//);
+    if (m) {
+      if (currentFile && currentLines.length > 0) files.push({ path: currentFile, content: currentLines.join(" ") });
+      currentFile = m[1];
+      currentLines = [];
+    } else if (line.startsWith("+") && !line.startsWith("+++")) {
+      currentLines.push(line.slice(1));
     }
-    const smaller = Math.min(newConcepts.size, existingConcepts.size);
-    // If >60% of the smaller concept set overlaps, it's a duplicate
-    if (smaller > 0 && overlap / smaller > 0.6) return true;
   }
-  return false;
+  if (currentFile && currentLines.length > 0) files.push({ path: currentFile, content: currentLines.join(" ") });
+  return files;
 }
 
-function regexToSample(pattern: string): string {
-  // Turn a regex into a plausible literal string it would match
-  let s = pattern;
-  s = s.replace(/\\\\/g, "BSLASH");
-  s = s.replace(/\\s[+*]/g, " ");
-  s = s.replace(/\\w[+*]/g, "foo");
-  s = s.replace(/\\[(){}[\].^$|]/g, (m) => m[1]);
-  s = s.replace(/\.\*/g, "xxx");
-  s = s.replace(/\.\+/g, "x");
-  s = s.replace(/\[[^\]]*\]/g, "x");
-  s = s.replace(/[+*?]/g, "");
-  s = s.replace(/[{}()]/g, "");
-  s = s.replace(/BSLASH/g, "\\");
-  return s;
+function testPattern(pattern: string, files: DiffFile[], filePattern?: string): boolean {
+  const regex = new RegExp(pattern);
+  const fp = filePattern ? new RegExp(filePattern) : null;
+  return files.some((f) => (!fp || fp.test(f.path)) && regex.test(f.content));
 }
 
-function isPatternSubsumed(newPattern: string, existingRules: LearnedRule[]): boolean {
-  const sample = regexToSample(newPattern);
-  for (const rule of existingRules) {
-    try {
-      if (new RegExp(rule.pattern).test(sample)) return true;
-    } catch { /* skip invalid */ }
+
+async function dedupWithLLM(
+  candidates: LearnedRule[],
+  existing: LearnedRule[]
+): Promise<LearnedRule[]> {
+  if (candidates.length === 0) return [];
+
+  const prompt = `You are deduplicating lint rules. Given EXISTING rules and CANDIDATE new rules, return ONLY the candidates that are genuinely new — not duplicates or narrower variants of existing rules.
+
+EXISTING RULES:
+${existing.map((r, i) => `${i + 1}. pattern: ${r.pattern} | ${r.message}`).join("\n")}
+
+CANDIDATE NEW RULES:
+${candidates.map((r, i) => `${i + 1}. pattern: ${r.pattern} | ${r.message}`).join("\n")}
+
+Dedup rules:
+- If two candidates cover the same concept (e.g. "as Config" and "as User" are both "type assertions"), keep only the BROADEST one
+- If a candidate overlaps with an existing rule (same concept, even if different regex), REMOVE it
+- If two candidates are identical in intent but from different skills, keep one
+
+Return a JSON array of candidate INDEXES (1-based) to KEEP.
+KEEP: [1, 4, 7]
+If none should be kept: KEEP: []`;
+
+  let text = "";
+  const q = query({
+    prompt,
+    options: {
+      maxTurns: 1,
+      permissionMode: "bypassPermissions",
+      allowDangerouslySkipPermissions: true,
+      allowedTools: [],
+      env: baseEnv,
+    },
+  });
+  for await (const msg of q) {
+    if (msg.type === "assistant") {
+      for (const b of msg.message.content) {
+        if (b.type === "text") text += b.text;
+      }
+    }
+    if (msg.type === "result") {
+      console.log(`[skill-check:dedup] turns: ${msg.num_turns}, cost: $${msg.total_cost_usd?.toFixed(4)}`);
+    }
   }
-  return false;
+
+  const keepMatch = text.match(/KEEP:\s*\[([^\]]*)\]/);
+  if (!keepMatch) {
+    console.log(`[skill-check:dedup] failed to parse, keeping all`);
+    return candidates;
+  }
+  const keepIndexes = keepMatch[1].split(",").map((s) => parseInt(s.trim())).filter((n) => !isNaN(n));
+  return candidates.filter((_, i) => keepIndexes.includes(i + 1));
 }
 
-async function graduateViolations(violations: Violation[]): Promise<number> {
+async function graduateViolations(violations: Violation[], diff: string): Promise<number> {
   const existing = await loadRules();
   const existingPatterns = new Set(existing.map((r) => r.pattern));
-  const allMessages = existing.map((r) => r.message);
-  let added = 0;
+  const files = parseDiffFiles(diff);
 
+  // Phase 1: validate — must have valid regex that matches the diff
+  const candidates: LearnedRule[] = [];
   for (const v of violations) {
     const rule = violationToRule(v);
     if (!rule) continue;
     if (existingPatterns.has(rule.pattern)) continue;
-    if (isDuplicateByIntent(rule.message, allMessages)) {
-      console.log(`[skill-check] skipped duplicate intent: ${rule.message.slice(0, 80)}`);
+    if (!testPattern(rule.pattern, files, rule.filePattern)) {
+      console.log(`[skill-check] rejected (no match): ${rule.pattern}`);
       continue;
     }
-    if (isPatternSubsumed(rule.pattern, existing)) {
-      console.log(`[skill-check] skipped subsumed pattern: ${rule.pattern}`);
-      continue;
-    }
-    existing.push(rule);
-    existingPatterns.add(rule.pattern);
-    allMessages.push(rule.message);
-    added++;
-    console.log(`[skill-check] graduated rule: ${rule.pattern}`);
+    candidates.push(rule);
   }
 
-  if (added > 0) await saveRules(existing);
-  return added;
+  if (candidates.length === 0) return 0;
+  console.log(`[skill-check] ${candidates.length} candidates passed validation, LLM dedup...`);
+
+  // Phase 2: LLM dedup
+  const deduped = await dedupWithLLM(candidates, existing);
+  console.log(`[skill-check] LLM kept ${deduped.length}/${candidates.length}`);
+
+  for (const rule of deduped) {
+    existing.push(rule);
+    console.log(`[skill-check] graduated: ${rule.pattern}`);
+  }
+
+  if (deduped.length > 0) await saveRules(existing);
+  return deduped.length;
 }
 
 function extractChangedFiles(diff: string): string[] {
@@ -263,47 +284,76 @@ async function discoverSkills(cwd: string): Promise<string[]> {
   }
 }
 
+async function loadSkillContent(cwd: string, skillName: string): Promise<string> {
+  const skillMd = join(cwd, ".claude", "skills", skillName, "SKILL.md");
+  try {
+    return await readFile(skillMd, "utf-8");
+  } catch {
+    return "";
+  }
+}
+
 async function reviewSkill(
   cwd: string,
   diff: string,
   skillName: string,
   coveredRules: LearnedRule[]
 ): Promise<Violation[]> {
-  const skillDir = `.claude/skills/${skillName}`;
+  const skillContent = await loadSkillContent(cwd, skillName);
   const skipSection = coveredRules.length > 0
-    ? `\n\nThese patterns are ALREADY covered by automated lint rules (across ALL skills) — do NOT flag violations that overlap with ANY of these, even if from a different skill:\n${coveredRules.map((r) => `- ${r.message}`).join("\n")}\n`
+    ? `\nALREADY COVERED (do NOT re-flag these):\n${coveredRules.map((r) => `- ${r.message}`).join("\n")}\n`
     : "";
 
   let text = "";
   const q = query({
-    prompt: `You are a focused code reviewer for the "${skillName}" skill.
+    prompt: `You are an aggressive code reviewer. Your job is to find EVERY anti-pattern described in the skill guidelines below.
 
-Here is the git diff to review:
+## Skill: ${skillName}
+
+${skillContent}
+
+## Git diff to review:
 \`\`\`diff
 ${diff}
 \`\`\`
+${skipSection}
+## Instructions
 
-Do the following:
-1. Read \`${skillDir}/SKILL.md\` to understand the skill guidelines.
-2. List \`${skillDir}/references/\` if it exists. Read key reference files.
-3. Review ONLY the added/changed lines in the diff against these specific skill guidelines.
-4. Only flag clear violations — not style preferences.${skipSection}
+Look at EVERY "Wrong" / "Anti-Pattern" / "Don't" example in the skill above. For each one, check if the diff contains that pattern. Be thorough — check every added line.
 
-Output your verdict as JSON on its own line prefixed with VERDICT:
+Common things to catch:
+- Type assertions (\`as X\`) instead of \`satisfies\`
+- \`enum\` instead of union types or const objects
+- \`@ts-ignore\` / \`@ts-expect-error\`
+- Optional fields modeling exclusive states instead of discriminated unions
+- \`onClick\` on \`<div>\` instead of \`<button>\`
+- Missing \`aria-label\` on icon-only buttons
+- Array index as key on dynamic lists
+- Hardcoded colors in inline styles
+- \`window.location\` instead of \`useSearchParams\`
+- \`router.push\` instead of \`<Link>\`
+- Unnecessary \`"use client"\` when no hooks/interactivity
+- \`useEffect\` to derive state that could be computed during render
+- Inline object/array literals in JSX props (re-created every render)
+- \`{count && <X/>}\` where count is a number (renders "0")
+
+Output JSON on its own line prefixed with VERDICT:
 - No violations: VERDICT: {"ok": true}
-- Violations: VERDICT: {"ok": false, "violations": [{"file": "path", "skill": "${skillName}", "rule": "what was violated", "fix": "how to fix", "pattern": "grep -E regex to detect this violation", "filePattern": "regex matching file paths this applies to"}]}
+- Violations: VERDICT: {"ok": false, "violations": [{"file": "path", "skill": "${skillName}", "rule": "short description", "fix": "how to fix", "pattern": "grep -E regex", "filePattern": "file path regex"}]}
 
-IMPORTANT rules for violations:
-- "pattern" must be a valid grep -E regex that catches this violation in source code. "filePattern" should match file paths (e.g. "\\\\.tsx?$", "routers/", "db/").
-- Do NOT emit a violation if an existing learned rule (listed above) already covers the same concept, even if your regex would be slightly different. For example, if there's already a rule catching ": any", don't add another variant of "no any". Deduplicate by INTENT, not by exact regex.
-- Prefer broad, reusable patterns over narrow ones. One rule catching all ": any" is better than separate rules for "any = await db", "any = JSON.parse", etc.`,
+REGEX RULES (critical — patterns that don't match get rejected):
+- Patterns are tested against file content with newlines collapsed to spaces.
+- Use \\s+ or .* to bridge newlines. Do NOT use [^)]* or [^>]* (they break on JSX arrow functions).
+- Before emitting, find the EXACT substring in the diff your regex matches. No match = rejected.
+- "filePattern" matches file paths, e.g. "\\\\.tsx?$"
+- Prefer broad patterns. One rule for all \`as X\` is better than separate rules per type.`,
     options: {
       cwd,
-      maxTurns: 6,
+      maxTurns: 3,
       permissionMode: "bypassPermissions",
       allowDangerouslySkipPermissions: true,
-      allowedTools: ["Read", "Glob"],
-      disallowedTools: ["Write", "Edit", "Bash"],
+      allowedTools: [],
+      disallowedTools: ["Write", "Edit", "Bash", "Read", "Glob"],
       env: baseEnv,
       hooks: { PreToolUse: [preToolUseHook] },
     },
@@ -397,6 +447,10 @@ app.post("/check", async (c) => {
     }
 
     const allViolations = results.flat();
+    console.log(`[skill-check] ${allViolations.length} total violations from ${relevantSkills.length} skills`);
+    for (const v of allViolations) {
+      console.log(`[skill-check]   → [${v.skill}] ${v.rule.slice(0, 80)} | pattern: ${v.pattern ?? "NONE"}`);
+    }
 
     if (allViolations.length === 0) {
       console.log(`[skill-check] all clear for ${cwd}`);
@@ -411,7 +465,7 @@ app.post("/check", async (c) => {
     }
     const message = lines.join("\n");
     // Graduate violations into learned rules for next time
-    const graduated = await graduateViolations(allViolations);
+    const graduated = await graduateViolations(allViolations, diff);
     if (graduated > 0) {
       console.log(`[skill-check] graduated ${graduated} new lint rules`);
     }

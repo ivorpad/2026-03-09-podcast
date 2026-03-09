@@ -340,22 +340,18 @@ Rules:
 
 ## Components to Add
 
-Components currently installed: badge, button, card, dialog, field, input, label, native-select, select, separator, skeleton, sonner, spinner, table, tabs, textarea.
+Components currently installed: avatar, badge, breadcrumb, button, card, chart, checkbox, collapsible, dialog, drawer, dropdown-menu, field, input, label, native-select, select, separator, sheet, sidebar, skeleton, sonner, spinner, table, tabs, textarea, toggle, toggle-group, tooltip.
 
 ### Needed for redesign:
 
 | Component | Why |
 |---|---|
-| `avatar` | Contact initials in list/detail views |
-| `tooltip` | Row action button labels on hover |
 | `scroll-area` | Dialog content overflow, sidebar nav |
-| `dropdown-menu` | Row action overflow menu (3+ actions) |
 | `alert` | Destructive action warnings |
 | `empty` | Structured empty states |
 | `progress` | Pipeline stage progress indicator on dashboard |
-| `chart` | Dashboard pipeline value chart |
 
-Install with: `pnpm dlx shadcn@latest add avatar tooltip scroll-area dropdown-menu alert empty progress chart`
+Install with: `pnpm dlx shadcn@latest add scroll-area alert empty progress`
 
 ## Anti-Patterns (Do NOT)
 

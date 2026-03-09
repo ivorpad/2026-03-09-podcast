@@ -51,8 +51,11 @@ src/components/
 │   ├── table.tsx
 │   ├── tabs.tsx
 │   └── textarea.tsx
-├── layout/
-│   └── sidebar.tsx     # App navigation sidebar
+├── app-sidebar.tsx          # App navigation sidebar
+├── nav-user.tsx             # User nav component
+├── section-cards.tsx        # Dashboard section cards
+├── site-header.tsx          # Site header bar
+├── theme-toggle.tsx         # Light/dark theme toggle
 ├── contacts/
 │   ├── contact-form.tsx       # Create/edit form (used in Dialog)
 │   ├── contact-summary.tsx    # AI summary Card
@@ -247,9 +250,11 @@ Global styles in `src/app/globals.css`:
 ## Installed shadcn Components
 
 ```
-badge, button, card, dialog, field, input, label,
-native-select, select, separator, skeleton, sonner,
-spinner, table, tabs, textarea
+avatar, badge, breadcrumb, button, card, chart, checkbox,
+collapsible, dialog, drawer, dropdown-menu, field, input,
+label, native-select, select, separator, sheet, sidebar,
+skeleton, sonner, spinner, table, tabs, textarea, toggle,
+toggle-group, tooltip
 ```
 
 See [DESIGN.md](./DESIGN.md) for the list of additional components to install.

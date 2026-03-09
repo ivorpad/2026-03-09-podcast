@@ -30,6 +30,12 @@ if [[ -z "$NEW_CONTENT" || -z "$FILE_PATH" ]]; then
     exit 0
 fi
 
+# Skip hook infrastructure (contains rule patterns as string literals)
+if [[ "$FILE_PATH" =~ \.claude/hooks/ ]]; then
+    echo "{}"
+    exit 0
+fi
+
 # Check each rule
 VIOLATIONS=""
 
