@@ -26,6 +26,11 @@
       "sourceType": "github",
       "computedHash": "d2f0a7065f7418fdb3ae88559f1f1426f40c26f2b5aebcd394797418d4bb3b04"
     },
+    "react-single-responsibility": {
+      "source": "lichens-innovation/skills",
+      "sourceType": "github",
+      "computedHash": "eba7ad5eda93566ca3437810c7c6a9510020f7400326a0c621bea9afe1f4628b"
+    },
     "shadcn": {
       "source": "shadcn/ui",
       "sourceType": "github",

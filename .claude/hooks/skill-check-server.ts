@@ -72,24 +72,9 @@ const preToolUseHook = {
   }],
 };
 
-// Provider config — SKILL_CHECK_PROVIDER: "alibaba" | "openrouter" | "anthropic"
-const PROVIDERS: Record<string, { baseUrl: string; token: string | undefined; model: string }> = {
-  alibaba: { baseUrl: "https://coding-intl.dashscope.aliyuncs.com/apps/anthropic", token: process.env.ANTHROPIC_AUTH_TOKEN, model: "qwen3.5-plus" },
-  openrouter: { baseUrl: "https://openrouter.ai/api", token: process.env.OPENROUTER_API_KEY ?? process.env.ANTHROPIC_AUTH_TOKEN, model: process.env.SKILL_CHECK_MODEL ?? "qwen/qwen-plus" },
-  anthropic: { baseUrl: process.env.ANTHROPIC_BASE_URL ?? "https://api.anthropic.com", token: process.env.ANTHROPIC_AUTH_TOKEN, model: process.env.SKILL_CHECK_MODEL ?? "claude-sonnet-4-20250514" },
-};
-const provider = PROVIDERS[process.env.SKILL_CHECK_PROVIDER ?? "alibaba"] ?? PROVIDERS.alibaba;
-console.log(`[skill-check] provider: ${process.env.SKILL_CHECK_PROVIDER ?? "alibaba"} (${provider.model})`);
-
-const baseEnv = {
-  ...Object.fromEntries(
-    Object.entries(process.env).filter(([k]) => !k.startsWith("CLAUDE"))
-  ),
-  ANTHROPIC_AUTH_TOKEN: provider.token,
-  ANTHROPIC_API_KEY: PROVIDERS[process.env.SKILL_CHECK_PROVIDER ?? "alibaba"] === PROVIDERS.openrouter ? "" : provider.token,
-  ANTHROPIC_BASE_URL: provider.baseUrl,
-  ANTHROPIC_MODEL: provider.model,
-};
+import { config } from "./skill-check-config";
+console.log(`[skill-check] provider: ${config.provider.name} (${config.provider.model})`);
+const baseEnv = config.env;
 
 type Violation = { file: string; skill: string; rule: string; fix: string; pattern?: string; filePattern?: string };
 type LearnedRule = { pattern: string; filePattern: string; message: string; skill: string; createdAt: string; llmOnly?: boolean };
