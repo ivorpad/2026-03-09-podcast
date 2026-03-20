@@ -15,7 +15,7 @@
 ## Sensitive Data
 
 - `ANTHROPIC_API_KEY` — environment variable, never in code
-- `sqlite.db` — in `.gitignore`, local only
+- `sqlite.db` — listed in `.gitignore`, not committed; create with `pnpm db:migrate` (optional `pnpm db:seed`)
 - No PII handling requirements for demo
 
 ## Future Considerations
