@@ -47,5 +47,34 @@
     "message": "[drizzle-best-practices] Use proper timestamp type instead of text for date/time columns → Change text('last_contacted_at') to timestamp('last_contacted_at') or timestamp('last_contacted_at').withDefault(sql`now()`) for PostgreSQL",
     "skill": "drizzle-best-practices",
     "createdAt": "2026-03-09T23:48:38.944Z"
+  },
+  {
+    "pattern": "",
+    "filePattern": "\\.tsx$",
+    "message": "[react-single-responsibility] Don't fetch in useEffect in App Router pages → Use Server Components for data fetching instead of useEffect, or use TanStack Query with useQuery",
+    "skill": "react-single-responsibility",
+    "createdAt": "2026-03-10T00:29:31.309Z",
+    "llmOnly": true
+  },
+  {
+    "pattern": "import\\s*{\\s*useState,\\s*useEffect\\s*}",
+    "filePattern": "\\.tsx?$",
+    "message": "[vercel-react-best-practices] Use SWR instead of useEffect for client-side data fetching → Replace useEffect-based data fetching with SWR hooks",
+    "skill": "vercel-react-best-practices",
+    "createdAt": "2026-03-10T00:29:31.309Z"
+  },
+  {
+    "pattern": "as\\s+Record<string,\\s+unknown>",
+    "filePattern": "\\.ts$",
+    "message": "[typescript-best-practices] Use satisfies instead of type assertions → Replace 'as Record<string, unknown>' with 'satisfies Record<string, unknown>'",
+    "skill": "typescript-best-practices",
+    "createdAt": "2026-03-10T08:48:55.105Z"
+  },
+  {
+    "pattern": "as\\s+(number|Record<string,\\s+unknown>)",
+    "filePattern": "\\.ts$",
+    "message": "[typescript-best-practices] Use satisfies instead of type assertions → Replace 'as number' and 'as Record<string, unknown>' with 'satisfies number' and 'satisfies Record<string, unknown>'",
+    "skill": "typescript-best-practices",
+    "createdAt": "2026-03-10T08:48:55.105Z"
   }
 ]
